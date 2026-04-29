@@ -126,23 +126,92 @@ If Voyage API rate-limits or prices increase significantly, bge-m3 is drop-in re
 
 ---
 
-## DEC-004 (placeholder for Week 2)
+## DEC-004: Replaced news_sentiment path with risk_and_events; consolidated to 3-path router
+**Date:** 2026-04-29 (Week 1 Day 2)
+
+### Context
+v2.1 spec had 4 router paths: earnings_analysis, financial_metrics, price_action, news_sentiment. After dataset EDA:
+- News dataset (Aaron7sun) turned out to be Reddit /r/worldnews + DJIA labels. Wrong granularity, wrong domain. Not ticker-tagged financial news.
+- OHLCV (Jackson Crow) ends 2020-04-01, limiting price_action to 11-month overlap with Motley Fool (2019-05→2020-04).
+- price_action is a database query dressed as RAG. Different retrieval pattern than actual RAG (pure DuckDB → answer), lowest interview value per hour invested.
+
+Considered FNSPID (22.7M ticker-tagged financial headlines) to save news_sentiment. Honest ROI analysis: matters for Hebbia/Rogo (1 of top 10 target companies). Not a differentiator elsewhere.
+
+### Options considered
+A. Ship as 4-path with weak news_sentiment (use FNSPID) and weak price_action
+B. Ship as 3-path (earnings / metrics / price) — drop news entirely
+C. Ship as 3-path (earnings / metrics / **risk_and_events**) — swap price_action for risk_and_events; keep OHLCV as universal context in Node 4
+
+### Decision
+Option C.
+
+### Rationale
+1. **OHLCV becomes universal context** — event-window charts are pulled in Node 4 (Context Builder) for any path that benefits. Not its own path.
+2. **risk_and_events is distinct** — 10-K Risk Factors are long, dense, legalese-y. Different chunking strategy than earnings transcripts. That per-corpus chunking ablation is a stronger interview artifact than a 4-path matrix with one weak path.
+3. **Reuses SEC EDGAR data** — no new corpus. 10-K Item 1A + 8-K material events pulled from the same EDGAR downloader we need for the `financial_metrics` path XBRL data.
+4. **Institutional analyst workflow match** — "What risks has Apple disclosed" is the first question an analyst asks. Risk Factors are Item 1A of every 10-K.
+5. **Conflict detection bonus** — 10-K risk disclosures can be cross-referenced with 8-K material events (company disclosed risk X in 10-K, then X happened in 8-K timeline).
+
+### Interview framing
+> "I started with a 4-path router from my v1 spec. After building earnings_analysis and financial_metrics, I realized price_action was a database query, not a retrieval problem. I moved OHLCV into Node 4 as universal context enrichment and replaced that path with risk_and_events, which needed genuinely different chunking — 10-K Risk Factors are long, dense, legalese-y, very different from earnings Q&A. That per-corpus chunking decision ended up being my strongest ablation story."
+
+### Trade-offs
+- **Gain:** cleaner architecture, stronger per-corpus chunking narrative, reuses existing SEC data
+- **Lose:** 4-modality claim becomes 3-modality (text + structured + time-series). Acceptable — "multimodal" still applies and is more honest.
+
+### Revisit trigger
+If interviewing at Hebbia or Rogo specifically, reconsider adding news_sentiment via FNSPID. Otherwise hold.
+
+---
+
+## DEC-005: Demo era shifted to 2019-2020 pandemic window. OHLCV = Jackson Crow (ends 2020-04).
+**Date:** 2026-04-29 (Week 1 Day 2)
+
+### Context
+v2.3 spec used "Q3 2024" as sample queries. Actual Motley Fool corpus is 2019-05 to 2023-02 (concentrated in 2020-2022). Tried multiple OHLCV sources:
+1. yfinance — 100% failure rate on 100-ticker test. Yahoo's 2024 API changes broke the library (returns "possibly delisted" for every ticker including AAPL, MSFT, NVDA).
+2. Stooq bulk — URL gated behind subscriber cookie; returns landing page, not zip.
+3. Stooq per-ticker API — requires captcha-gated apikey; captcha gate was unreachable at time of download.
+4. Alpha Vantage free — 25 calls/day would take 4 days for 100 tickers.
+5. Tiingo free — 50/hour would take 2 hours.
+
+### Decision
+Keep **Jackson Crow OHLCV (2019-05 to 2020-04)** as-is. Shift demo focus to the **March 2020 pandemic crash window**.
+
+### Rationale
+1. **This constraint converges with the architecture.** DEC-004 moved OHLCV out of being its own router path into Node 4 universal context enrichment. For that role, 11 months of overlap is sufficient.
+2. **March 2020 is the strongest single event window** in the corpus. Every major-cap ticker has:
+   - Q4 2019 earnings call (pre-pandemic optimism)
+   - Q1 2020 earnings call (mid-crash, guidance withdrawals, COVID commentary)
+   - Dramatic OHLCV moves between
+   This is event-study gold — rich conflict material, rich narrative moments.
+3. **No more time spent on OHLCV sourcing.** Every alternative hit a paywall, captcha, or rate limit. Effort cap reached — fall back to known-good data.
+4. **Jackson Crow licensing is clean** — Kaggle public dataset, redistributable for research.
+
+### Interview framing
+> "Demo focuses on the March 2020 pandemic crash — event-study window with concurrent earnings calls showing guidance revisions and COVID commentary. OHLCV is from the Jackson Crow Kaggle dataset (2019-2023 US stocks). For a production refresh of OHLCV I explored yfinance (broken after Yahoo's 2024 API changes) and Stooq (captcha-gated), and would use a paid vendor (Polygon, Tiingo) in production. Documented in decisions.md."
+
+### Trade-offs
+- **Gain:** move on, focus on the differentiators (conflict detector, risk_and_events path)
+- **Lose:** demo queries can't reference 2021-2023 price moves with context. Acceptable — OHLCV isn't its own path per DEC-004.
+
+### Revisit trigger
+None for v2.3. If a target interview specifically asks about real-time data, point to the paid-vendor answer in the interview framing.
+
+---
+
+## DEC-006 (placeholder for Week 2)
 **Topic:** Cohere Rerank 3.5 vs local ms-marco-MiniLM cross-encoder. Will populate after implementing both in Week 2.
 
 ---
 
-## DEC-005 (placeholder for Week 3)
+## DEC-007 (placeholder for Week 3)
 **Topic:** Conflict detector threshold calibration — how we learned per-metric thresholds from 20+20 labeled pairs instead of hand-tuning.
 
 ---
 
-## DEC-006 (placeholder for Week 4)
+## DEC-008 (placeholder for Week 4)
 **Topic:** Cost routing story — measured cost reduction from Haiku-intent + Sonnet-synthesis + prompt caching vs Sonnet-on-every-query.
-
----
-
-## DEC-007 (placeholder for Week 4)
-**Topic:** Failure mode discovered in production (inevitable). Write the war story as soon as it happens.
 
 ---
 
