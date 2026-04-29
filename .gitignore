@@ -205,3 +205,29 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# FinSight project
+.DS_Store
+.cursor/
+data/raw/
+data/processed/
+data/interim/
+*.parquet
+*.duckdb
+*.faiss
+*.sqlite
+artifacts/
+!artifacts/golden_set/
+mlruns/
+.mlflow/
+qdrant_storage/
+evals/results/*.jsonl
+evals/results/*.csv
+!evals/results/.gitkeep
+logs/
+*.pkl
+*.joblib
+.ipynb_checkpoints/
+
+# Claude Code memory (private career strategy)
+memory/
