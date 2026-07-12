@@ -157,17 +157,41 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your API keys
 
-# Spin up Qdrant + MLflow
+# Spin up Qdrant (Docker Compose, or Colima, or the native `qdrant` binary)
 docker-compose up -d qdrant mlflow
 ```
 
-### Ingest data (Week 1 Day 3+)
-```bash
-# Download Kaggle datasets to data/raw/
-# (see docs/ingestion.md — Week 1 Day 3 artifact)
+### Reproducing the data from a clean clone
 
-python -m src.ingestion.loader --source motley_fool
-python -m src.indexing.ingest_vectors --corpus transcripts
+Raw datasets (~8 GB) are gitignored — fetch them first, then run the pipeline.
+`artifacts/ticker_universe.json` (the 76-ticker scope) **is** committed, so the
+loaders filter correctly out of the box.
+
+**1. Fetch raw sources → `data/raw/`:**
+```bash
+# Motley Fool earnings transcripts (manual Kaggle download):
+#   kaggle.com/datasets/tpotterer/motley-fool-scraped-earnings-call-transcripts
+#   → place motley-fool-data.pkl in data/raw/motley_fool/
+# OHLCV prices (manual Kaggle download):
+#   kaggle.com/datasets/jacksoncrow/stock-market-dataset
+#   → place stock CSVs in data/raw/ohlcv/stocks/
+# SEC EDGAR filings (automated):
+python scripts/download_sec_edgar.py
+```
+
+**2. Load raw → DuckDB `documents` / `prices` tables:**
+```bash
+python -m src.ingestion.motley_fool_loader   # transcripts → documents
+python -m src.ingestion.ohlcv_loader         # OHLCV → prices
+python -m src.ingestion.sec_filing_parser    # 10-K/10-Q/8-K → documents
+```
+
+**3. Chunk + embed → DuckDB `chunks` + Qdrant vectors:**
+```bash
+# bge-m3 local embeddings. Transcripts alone ≈ 15K chunks, ~2 hrs on Apple MPS.
+python -m src.indexing.ingest_vectors --doc-type earnings_transcript
+# Smoke-test first with a subset:  --limit 10
+# Wipe and start over:             python -m scripts.reset_chunks
 ```
 
 ### Run locally

@@ -216,8 +216,9 @@ data/interim/
 *.duckdb
 *.faiss
 *.sqlite
-artifacts/
+artifacts/*
 !artifacts/golden_set/
+!artifacts/ticker_universe.json
 mlruns/
 .mlflow/
 qdrant_storage/

@@ -1,0 +1,1222 @@
+{
+  "version": "v2.3-final",
+  "actual_count": 76,
+  "selection_criteria": [
+    "Present in Motley Fool transcripts",
+    "Has OHLCV CSV in Jackson Crow dataset",
+    "Has >= 3 substantive SEC filings (10-K + 10-Q) in 2019-2023"
+  ],
+  "dropped_count": 24,
+  "tickers": [
+    {
+      "ticker": "AAPL",
+      "transcript_count": 62,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2023-02-02",
+      "exchanges": [
+        "NASDAQ: AAPL"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "GOOGL",
+      "transcript_count": 58,
+      "first_transcript": "2020-10-29",
+      "last_transcript": "2023-02-02",
+      "exchanges": [
+        "NASDAQ: GOOGL"
+      ],
+      "sec_filings": {
+        "10-K": 1,
+        "10-Q": 3,
+        "8-K": 10
+      }
+    },
+    {
+      "ticker": "TSLA",
+      "transcript_count": 52,
+      "first_transcript": "2019-10-23",
+      "last_transcript": "2023-01-25",
+      "exchanges": [
+        "NASDAQ: TSLA"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "AMZN",
+      "transcript_count": 39,
+      "first_transcript": "2020-07-30",
+      "last_transcript": "2023-02-02",
+      "exchanges": [
+        "NASDAQ: AMZN"
+      ],
+      "sec_filings": {
+        "10-K": 3,
+        "10-Q": 12,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "DIS",
+      "transcript_count": 38,
+      "first_transcript": "2019-11-07",
+      "last_transcript": "2023-02-08",
+      "exchanges": [
+        "NYSE: DIS"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 12,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "MRNA",
+      "transcript_count": 21,
+      "first_transcript": "2020-05-09",
+      "last_transcript": "2022-11-03",
+      "exchanges": [
+        "NASDAQ: MRNA"
+      ],
+      "sec_filings": {
+        "10-K": 3,
+        "10-Q": 9,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "PTC",
+      "transcript_count": 21,
+      "first_transcript": "2020-01-22",
+      "last_transcript": "2023-02-01",
+      "exchanges": [
+        "NASDAQ: PTC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "IBM",
+      "transcript_count": 18,
+      "first_transcript": "2020-07-20",
+      "last_transcript": "2023-01-25",
+      "exchanges": [
+        "NYSE: IBM"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 12,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "KO",
+      "transcript_count": 17,
+      "first_transcript": "2020-04-21",
+      "last_transcript": "2022-10-25",
+      "exchanges": [
+        "NYSE: KO"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "INTC",
+      "transcript_count": 16,
+      "first_transcript": "2020-07-23",
+      "last_transcript": "2023-01-26",
+      "exchanges": [
+        "NASDAQ: INTC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CLDT",
+      "transcript_count": 16,
+      "first_transcript": "2019-07-31",
+      "last_transcript": "2021-11-04",
+      "exchanges": [
+        "NYSE: CLDT"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "WMT",
+      "transcript_count": 15,
+      "first_transcript": "2021-02-18",
+      "last_transcript": "2022-11-15",
+      "exchanges": [
+        "NYSE: WMT"
+      ],
+      "sec_filings": {
+        "10-K": 1,
+        "10-Q": 3,
+        "8-K": 12
+      }
+    },
+    {
+      "ticker": "CF",
+      "transcript_count": 15,
+      "first_transcript": "2019-08-01",
+      "last_transcript": "2021-08-10",
+      "exchanges": [
+        "NYSE: CF"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "ACM",
+      "transcript_count": 15,
+      "first_transcript": "2019-08-06",
+      "last_transcript": "2022-08-09",
+      "exchanges": [
+        "NYSE: ACM"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CCL",
+      "transcript_count": 15,
+      "first_transcript": "2019-09-26",
+      "last_transcript": "2022-12-21",
+      "exchanges": [
+        "NYSE: CCL"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "TTWO",
+      "transcript_count": 15,
+      "first_transcript": "2019-08-05",
+      "last_transcript": "2023-02-06",
+      "exchanges": [
+        "NASDAQ: TTWO"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "MGRC",
+      "transcript_count": 15,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2023-02-22",
+      "exchanges": [
+        "NASDAQ: MGRC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "PRGS",
+      "transcript_count": 15,
+      "first_transcript": "2019-12-03",
+      "last_transcript": "2022-09-27",
+      "exchanges": [
+        "NASDAQ: PRGS"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "EQIX",
+      "transcript_count": 15,
+      "first_transcript": "2020-05-06",
+      "last_transcript": "2022-11-02",
+      "exchanges": [
+        "NASDAQ: EQIX"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 14,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "GPK",
+      "transcript_count": 14,
+      "first_transcript": "2019-07-23",
+      "last_transcript": "2022-07-26",
+      "exchanges": [
+        "NYSE: GPK"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "HWC",
+      "transcript_count": 14,
+      "first_transcript": "2019-07-17",
+      "last_transcript": "2022-07-19",
+      "exchanges": [
+        "NASDAQ: HWC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CCI",
+      "transcript_count": 14,
+      "first_transcript": "2020-02-27",
+      "last_transcript": "2023-01-26",
+      "exchanges": [
+        "NYSE: CCI"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "IT",
+      "transcript_count": 14,
+      "first_transcript": "2020-08-04",
+      "last_transcript": "2021-11-02",
+      "exchanges": [
+        "NYSE: IT"
+      ],
+      "sec_filings": {
+        "10-K": 2,
+        "10-Q": 8,
+        "8-K": 15
+      }
+    },
+    {
+      "ticker": "GTN",
+      "transcript_count": 14,
+      "first_transcript": "2020-02-27",
+      "last_transcript": "2022-08-05",
+      "exchanges": [
+        "NYSE: GTN"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "AEO",
+      "transcript_count": 14,
+      "first_transcript": "2019-06-05",
+      "last_transcript": "2021-11-23",
+      "exchanges": [
+        "NYSE: AEO"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "NJR",
+      "transcript_count": 14,
+      "first_transcript": "2019-08-06",
+      "last_transcript": "2021-11-18",
+      "exchanges": [
+        "NYSE: NJR"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "FDX",
+      "transcript_count": 14,
+      "first_transcript": "2019-06-25",
+      "last_transcript": "2022-12-20",
+      "exchanges": [
+        "NYSE: FDX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "TOL",
+      "transcript_count": 14,
+      "first_transcript": "2019-05-22",
+      "last_transcript": "2021-12-08",
+      "exchanges": [
+        "NYSE: TOL"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "OTEX",
+      "transcript_count": 14,
+      "first_transcript": "2019-08-01",
+      "last_transcript": "2023-02-02",
+      "exchanges": [
+        "NASDAQ: OTEX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "RH",
+      "transcript_count": 14,
+      "first_transcript": "2019-12-04",
+      "last_transcript": "2022-12-08",
+      "exchanges": [
+        "NYSE: RH"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "GBX",
+      "transcript_count": 14,
+      "first_transcript": "2019-07-02",
+      "last_transcript": "2022-07-11",
+      "exchanges": [
+        "NYSE: GBX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "KMB",
+      "transcript_count": 14,
+      "first_transcript": "2020-04-22",
+      "last_transcript": "2023-01-25",
+      "exchanges": [
+        "NYSE: KMB"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "LQDT",
+      "transcript_count": 14,
+      "first_transcript": "2019-12-10",
+      "last_transcript": "2021-12-09",
+      "exchanges": [
+        "NASDAQ: LQDT"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "DLB",
+      "transcript_count": 14,
+      "first_transcript": "2019-08-01",
+      "last_transcript": "2022-05-05",
+      "exchanges": [
+        "NYSE: DLB"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "SNAP",
+      "transcript_count": 14,
+      "first_transcript": "2019-07-23",
+      "last_transcript": "2023-01-31",
+      "exchanges": [
+        "NYSE: SNAP"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "RBA",
+      "transcript_count": 13,
+      "first_transcript": "2019-08-09",
+      "last_transcript": "2022-08-05",
+      "exchanges": [
+        "NYSE: RBA"
+      ],
+      "sec_filings": {
+        "10-K": 3,
+        "10-Q": 9,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "KRG",
+      "transcript_count": 13,
+      "first_transcript": "2019-08-06",
+      "last_transcript": "2022-04-29",
+      "exchanges": [
+        "NYSE: KRG"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CASH",
+      "transcript_count": 13,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2021-10-27",
+      "exchanges": [
+        "NASDAQ: CASH"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "DAN",
+      "transcript_count": 13,
+      "first_transcript": "2019-07-31",
+      "last_transcript": "2021-10-26",
+      "exchanges": [
+        "NYSE: DAN"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "ACCO",
+      "transcript_count": 13,
+      "first_transcript": "2019-07-31",
+      "last_transcript": "2021-10-27",
+      "exchanges": [
+        "NYSE: ACCO"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 14,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "WDC",
+      "transcript_count": 13,
+      "first_transcript": "2019-10-30",
+      "last_transcript": "2023-01-31",
+      "exchanges": [
+        "NASDAQ: WDC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "WDFC",
+      "transcript_count": 13,
+      "first_transcript": "2019-10-17",
+      "last_transcript": "2023-01-09",
+      "exchanges": [
+        "NASDAQ: WDFC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "APOG",
+      "transcript_count": 13,
+      "first_transcript": "2019-06-27",
+      "last_transcript": "2021-12-21",
+      "exchanges": [
+        "NASDAQ: APOG"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "WOR",
+      "transcript_count": 13,
+      "first_transcript": "2019-06-27",
+      "last_transcript": "2022-09-29",
+      "exchanges": [
+        "NYSE: WOR"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "ZBRA",
+      "transcript_count": 13,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2023-02-16",
+      "exchanges": [
+        "NASDAQ: ZBRA"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "ADSK",
+      "transcript_count": 13,
+      "first_transcript": "2019-05-23",
+      "last_transcript": "2022-11-22",
+      "exchanges": [
+        "NASDAQ: ADSK"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "UEIC",
+      "transcript_count": 13,
+      "first_transcript": "2019-08-08",
+      "last_transcript": "2022-08-04",
+      "exchanges": [
+        "NASDAQ: UEIC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CGNX",
+      "transcript_count": 13,
+      "first_transcript": "2019-07-29",
+      "last_transcript": "2023-02-16",
+      "exchanges": [
+        "NASDAQ: CGNX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "GEOS",
+      "transcript_count": 13,
+      "first_transcript": "2019-08-09",
+      "last_transcript": "2022-08-10",
+      "exchanges": [
+        "NASDAQ: GEOS"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CRWD",
+      "transcript_count": 13,
+      "first_transcript": "2019-12-05",
+      "last_transcript": "2022-11-29",
+      "exchanges": [
+        "NASDAQ: CRWD"
+      ],
+      "sec_filings": {
+        "10-K": 3,
+        "10-Q": 12,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "FHB",
+      "transcript_count": 13,
+      "first_transcript": "2019-07-25",
+      "last_transcript": "2022-07-29",
+      "exchanges": [
+        "NASDAQ: FHB"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "DGICA",
+      "transcript_count": 13,
+      "first_transcript": "2020-04-29",
+      "last_transcript": "2021-10-28",
+      "exchanges": [
+        "NASDAQ: DGICA"
+      ],
+      "sec_filings": {
+        "10-K": 3,
+        "10-Q": 11,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "AXP",
+      "transcript_count": 12,
+      "first_transcript": "2021-01-26",
+      "last_transcript": "2023-01-27",
+      "exchanges": [
+        "NYSE: AXP"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 14,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "UHAL",
+      "transcript_count": 12,
+      "first_transcript": "2019-08-08",
+      "last_transcript": "2021-11-04",
+      "exchanges": [
+        "NASDAQ: UHAL"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "JLL",
+      "transcript_count": 12,
+      "first_transcript": "2019-08-06",
+      "last_transcript": "2022-08-03",
+      "exchanges": [
+        "NYSE: JLL"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "AVAV",
+      "transcript_count": 12,
+      "first_transcript": "2019-09-04",
+      "last_transcript": "2022-12-06",
+      "exchanges": [
+        "NASDAQ: AVAV"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "DG",
+      "transcript_count": 12,
+      "first_transcript": "2019-08-29",
+      "last_transcript": "2022-12-01",
+      "exchanges": [
+        "NYSE: DG"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "GIII",
+      "transcript_count": 12,
+      "first_transcript": "2019-06-05",
+      "last_transcript": "2021-12-01",
+      "exchanges": [
+        "NASDAQ: GIII"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "KRC",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-25",
+      "last_transcript": "2021-10-28",
+      "exchanges": [
+        "NYSE: KRC"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "STX",
+      "transcript_count": 12,
+      "first_transcript": "2019-11-01",
+      "last_transcript": "2022-10-26",
+      "exchanges": [
+        "NASDAQ: STX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "TEX",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2022-08-03",
+      "exchanges": [
+        "NYSE: TEX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CODI",
+      "transcript_count": 12,
+      "first_transcript": "2019-10-30",
+      "last_transcript": "2022-08-03",
+      "exchanges": [
+        "NYSE: CODI"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "ORCL",
+      "transcript_count": 12,
+      "first_transcript": "2019-09-12",
+      "last_transcript": "2022-12-12",
+      "exchanges": [
+        "NYSE: ORCL"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "JOUT",
+      "transcript_count": 12,
+      "first_transcript": "2020-05-05",
+      "last_transcript": "2022-08-05",
+      "exchanges": [
+        "NASDAQ: JOUT"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "LIN",
+      "transcript_count": 12,
+      "first_transcript": "2019-05-10",
+      "last_transcript": "2021-10-28",
+      "exchanges": [
+        "NYSE: LIN"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "CAG",
+      "transcript_count": 12,
+      "first_transcript": "2019-09-26",
+      "last_transcript": "2023-01-05",
+      "exchanges": [
+        "NYSE: CAG"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "NOW",
+      "transcript_count": 12,
+      "first_transcript": "2019-10-23",
+      "last_transcript": "2023-01-25",
+      "exchanges": [
+        "NYSE: NOW"
+      ],
+      "sec_filings": {
+        "10-K": 1,
+        "10-Q": 5,
+        "8-K": 9
+      }
+    },
+    {
+      "ticker": "EA",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2022-11-01",
+      "exchanges": [
+        "NASDAQ: EA"
+      ],
+      "sec_filings": {
+        "10-K": 4,
+        "10-Q": 11,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "BRX",
+      "transcript_count": 12,
+      "first_transcript": "2019-10-29",
+      "last_transcript": "2021-11-02",
+      "exchanges": [
+        "NYSE: BRX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "DOMO",
+      "transcript_count": 12,
+      "first_transcript": "2019-12-05",
+      "last_transcript": "2022-12-08",
+      "exchanges": [
+        "NASDAQ: DOMO"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "SUI",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-25",
+      "last_transcript": "2021-10-26",
+      "exchanges": [
+        "NYSE: SUI"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "AGCO",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-30",
+      "last_transcript": "2021-10-28",
+      "exchanges": [
+        "NYSE: AGCO"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "BFAM",
+      "transcript_count": 12,
+      "first_transcript": "2019-08-01",
+      "last_transcript": "2022-08-02",
+      "exchanges": [
+        "NYSE: BFAM"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "FOXF",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-31",
+      "last_transcript": "2021-11-04",
+      "exchanges": [
+        "NASDAQ: FOXF"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "GATX",
+      "transcript_count": 12,
+      "first_transcript": "2019-07-18",
+      "last_transcript": "2021-10-21",
+      "exchanges": [
+        "NYSE: GATX"
+      ],
+      "sec_filings": {
+        "10-K": 5,
+        "10-Q": 15,
+        "8-K": 20
+      }
+    },
+    {
+      "ticker": "LLY",
+      "transcript_count": 12,
+      "first_transcript": "2020-04-23",
+      "last_transcript": "2023-02-02",
+      "exchanges": [
+        "NYSE: LLY"
+      ],
+      "sec_filings": {
+        "10-K": 2,
+        "10-Q": 8,
+        "8-K": 20
+      }
+    }
+  ],
+  "dropped": [
+    {
+      "ticker": "BEST",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "SE",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "WWE",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "SQ",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "BLK",
+      "reasons": [
+        "sparse SEC coverage (0 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "YY",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "AXL",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "NTES",
+      "reasons": [
+        "sparse SEC coverage (0 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "COUP",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "GLYC",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "CRM",
+      "reasons": [
+        "sparse SEC coverage (2 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "EXPR",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "CDAY",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "CDMO",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "NWE",
+      "reasons": [
+        "sparse SEC coverage (1 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "INT",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "SHOP",
+      "reasons": [
+        "sparse SEC coverage (0 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "SKX",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "SPNS",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "FTS",
+      "reasons": [
+        "sparse SEC coverage (0 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "BKI",
+      "reasons": [
+        "no CIK in SEC master (delisted/acquired/renamed)"
+      ]
+    },
+    {
+      "ticker": "CLB",
+      "reasons": [
+        "sparse SEC coverage (2 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "SPOT",
+      "reasons": [
+        "sparse SEC coverage (0 substantive filings)"
+      ]
+    },
+    {
+      "ticker": "BIDU",
+      "reasons": [
+        "sparse SEC coverage (0 substantive filings)"
+      ]
+    }
+  ]
+}
