@@ -213,6 +213,111 @@ None for v2.3. If a target interview specifically asks about real-time data, poi
 ## DEC-008 (placeholder for Week 4)
 **Topic:** Cost routing story — measured cost reduction from Haiku-intent + Sonnet-synthesis + prompt caching vs Sonnet-on-every-query.
 
+**Week 1 note (2026-06-23):** Prompt caching is wired (a `cache_control` breakpoint on the system prompt in `generator.py`), but measured `cache_read=0` in Week 1 — the Week-1 system prompt (~350 tokens) is **below Sonnet 4.6's 2048-token minimum cacheable prefix**, so Anthropic silently declines to cache it. Deliberately NOT padding the prompt to cross the threshold (that would game the metric). The real cache win lands in Week 2 when the LangGraph system prompt (router instructions + few-shot + per-path context) clears 2048 naturally. Honest interview framing: "caching is architected in from day one; it starts paying off once the prompt is large enough to cache, which is the Week-2 pipeline — I didn't inflate the prompt just to show a cache hit."
+
+---
+
+## DEC-010: Anthropic API accessed directly for the generation core; OpenRouter reserved for the multi-model eval
+**Date:** 2026-06-23 (Week 1 Day 5 — first live generation wiring)
+
+### Context
+Wiring the generator surfaced two environment problems on the dev machine: (1) an ambient `ANTHROPIC_BASE_URL` pointing at a corporate model-gateway proxy (with its own CA bundle) was intercepting the SDK's calls and failing TLS verification under Homebrew Python; (2) the personal Anthropic key had a $0 credit balance. Available credit was OpenAI ($22), OpenRouter ($10), and Google Cloud/Gemini ($300). The question: power FinSight's generation core through OpenRouter (existing credit, easy model-swapping) or add a small direct Anthropic top-up.
+
+### Options considered
+A. **OpenRouter for the generation core** — use existing $10, one OpenAI-compatible endpoint, trivial model-swapping across providers.
+B. **Gemini for the generation core** — largest runway ($300), but a full rewrite and off-narrative.
+C. **Anthropic direct for the core; OpenRouter for the Week-3 eval** — ~$5 top-up keeps the native path; use OpenRouter later where model-swapping is the actual requirement.
+
+### Decision
+Option C.
+- Generation core stays on the native Anthropic SDK (`anthropic.Anthropic`), pinned to `https://api.anthropic.com` and using certifi's CA bundle so it ignores the corporate proxy env and verifies TLS regardless of shell state (see `src/generation/generator.py`).
+- OpenRouter is reserved for Week 3's Claude-vs-GPT-4o faithfulness eval, where a single OpenAI-compatible endpoint with a swappable model string is genuinely the right tool.
+
+### Rationale
+1. **The API surface differs even though the model weights don't.** OpenRouter exposes an OpenAI-compatible API. Claude *via* OpenRouter is the same model, but the request shape is not — native Anthropic **prompt caching (`cache_control`)** and **structured-citation tool use** do not translate cleanly through the OpenAI-compatible layer. Both are load-bearing interview signals (the "80% cache-hit / ~55% cost-routing" story and "schema-validated citations beat regex").
+2. **Cost is not the real axis.** Week 1 generation testing is cents; ~$5 direct covers it. Routing through OpenRouter to avoid a $5 top-up trades away two interview signals for no meaningful saving.
+3. **OpenRouter still has a real home** — its provider-swapping is exactly what the multi-model eval wants. Right tool, later phase.
+4. **Work/personal boundary.** The corporate gateway is a Salesforce asset; a personal portfolio project should hit Anthropic directly with a personal key. Pinning `base_url` in code enforces that boundary permanently, not per-shell.
+
+### Interview framing
+> "Same model weights, different API. I kept the generation path on Anthropic's native API specifically to use prompt caching and structured tool-use for citations — those are the mechanisms behind my cost and groundedness numbers. I did wire in an OpenRouter path, but only for the multi-model eval, where swapping Claude for GPT-4o with one string is the whole point."
+
+### Trade-offs
+- **Gain:** preserves native caching + tool-use (interview signals); clean work/personal separation; OpenRouter used where it's actually superior.
+- **Lose:** a tiny out-of-pocket top-up; two code paths (native for core, OpenAI-compatible for eval) instead of one.
+
+### Revisit trigger
+If Anthropic access is ever unavailable for a live demo, the documented fallback is OpenRouter for generation (accepting the loss of native caching/tool-use) — a graceful-degradation story, not the default.
+
+---
+
+## DEC-011: Inline [N] citations over forced tool-use — to preserve streaming
+**Date:** 2026-06-23 (Week 1 Day 5 — generation latency)
+
+### Context
+v2.3 specced structured citations via Claude tool use with a Pydantic schema ("defensible; beats regex"). First implementation did exactly that: a required `emit_answer` tool with `tool_choice: {type: "tool"}`, whose schema forced per-claim citations. It worked and produced clean structured output — but measured **~11s to first token**. v2.3 also specs "first token < 500ms makes 3s P95 feel fast." Those two requirements collided.
+
+### Root cause
+With forced `tool_choice`, Claude buffers the *entire* tool-input JSON internally before emitting any stream event — so `answer_text` doesn't surface until generation is nearly done. Isolated test: plain-text streaming first token = **1.16s**; forced-tool-use first token = **11.6s**. The structure guarantee costs the streaming UX.
+
+### Options considered
+A. **Keep forced tool-use, drop streaming** — clean structure, but 11s dead air; fails the UX principle and demos badly.
+B. **Two calls** — stream plain text, then a second call to structure citations. Doubles cost + latency.
+C. **Inline [N] citations in streamed plain text, parsed post-hoc** — model writes "revenue grew 17% [3]" as it streams; regex-parse [N] markers into structured Citation objects mapped to source chunks.
+
+### Decision
+Option C. Stream plain text with inline [N] markers; parse them into structured citations from the completed text (`_parse_citations` in `generator.py`). Measured: **1.3s first token, ~8.5s total (warm)**.
+
+### Rationale
+1. **Both requirements met in one call** — sub-second first token AND structured, source-mapped citations. No second call, no cost penalty.
+2. **This is how production RAG does it** (Perplexity, Bing Copilot all use inline citation markers over streamed text) — a more defensible interview answer than a purpose-built tool.
+3. **The "beats regex" concern is narrower than it looked** — regex is fragile when parsing *free-form* model prose for citations, but parsing a constrained `[N]` marker the model was explicitly instructed to emit is robust. The structure lives in the prompt contract + a trivial, total regex, not in brittle pattern-matching of natural language.
+
+### Trade-offs
+- **Gain:** streaming UX (the load-bearing demo signal), single call, production-idiomatic.
+- **Lose:** the citation structure is not *schema-enforced* by the API — a malformed answer with no [N] markers yields zero citations rather than an API-level error. Mitigated by the prompt contract and the fact that missing citations are visibly detectable (empty citation list in the UI).
+
+### Revisit trigger
+If groundedness eval (Week 3 RAGAS) shows citation coverage dropping, revisit: either tighten the prompt, or offer a non-streaming "strict mode" that uses forced tool-use for eval runs while streaming stays the default for the live demo.
+
+---
+
+## DEC-009: Rebalanced portfolio signal from eval-depth to deployment-judgment for the SA/FDE/PM role band
+**Date:** 2026-05-31 (Week 1 — positioning review)
+
+### Context
+Target roles sharpened from "Principal SA / FDE / Applied AI" to a tighter band: **Forward-Deployed Engineer (and FDE lead/manager), Director, Principal Solutions Architect, TPM, and AI Product Manager** — across AI-native companies broadly. Every one of these is a *technical-credibility + customer/stakeholder-judgment* seat. None is a deep-research or pure-MLE seat.
+
+v2.3's heaviest technical investment is the eval suite: 3 ablation tables + MLflow experiment lineage + a Claude-vs-GPT-4o multi-LLM comparison. That stack is calibrated to the **research/MLE signal** — the one band we have explicitly stepped out of. Meanwhile, nothing in v2.3 directly demonstrates the band we are now *in*: can this person handle a messy real-world deployment in front of a customer? The strongest raw material for that story already exists (the DEC-005 OHLCV sourcing battle) but it is buried as a footnote, not surfaced as an artifact.
+
+### Options considered
+A. **Rewrite the spec as v2.4** — re-scope eval work down, add deployment work in. Clean on paper, but re-opening a deliberately scope-locked spec creates version churn and undercuts the disciplined-scoping narrative that makes the project interview well.
+B. **Hard-cut eval depth now** — immediately demote MLflow lineage + multi-LLM compare to "future work," reclaim the hours this week. Decisive, but destroys MLE-backup optionality before we know whether Week 3 even runs short.
+C. **Record the decision, keep the spec intact** — keep the single headline retrieval ablation (the universal "decisions-with-numbers" artifact), log the *intent* to demote the deeper eval work, and make the actual cut at the Week 3 Sunday review based on real schedule pressure. Add the deployment-judgment artifacts (playbook + positioning doc) now, since they are pure additive leverage with no scope risk.
+
+### Decision
+Option C.
+- **Keep** the one headline retrieval ablation: *hybrid+rerank beats dense-only by X% NDCG at $Y/query.* This is a universal talking point — SA, FDE, TPM, and PM interviewers all reward "I made this decision with a number."
+- **Record intent** to demote MLflow lineage + the Claude-vs-GPT-4o comparison to one-line "future work" entries — but **only if Week 3 time slips.** The v2.3 Week 3 plan is left untouched; the call is deferred to the Week 3 cut.
+- **Reinvest** any freed hours into `docs/deployment-playbook.md` — promoting the DEC-005 messy-data saga from footnote to a forward-deployed war story.
+- **Add** `docs/interview-positioning.md` to map each target role to the artifact that answers its core question.
+
+### Rationale
+1. **Signal-to-role fit.** For an FDE/SA interviewer the load-bearing question is "would I send this person to a customer site?" A clean benchmark table doesn't answer it; a "here's how I'd deploy this at a regulated fund, and here's the dirty data I already wrestled" narrative does.
+2. **The deployment story is already lived, not invented.** DEC-005 (yfinance broke after Yahoo's 2024 API change; Stooq captcha-gated; fell back to known-good data and shifted the demo to the March 2020 crash) is a genuine forward-deployed war story. Retroactive-sounding entries read as fake in interviews; this one is real.
+3. **Preserve optionality cheaply.** Deferring the eval-cut to Week 3 costs nothing now and keeps the MLE-backup signal alive until we actually need the hours.
+4. **No version churn.** Logging this as a decision rather than a v2.4 *is itself* the disciplined-scoping signal these roles screen for.
+
+### Interview framing
+> "I scoped the eval work to one headline ablation with a real number, and deliberately *didn't* go deeper on experiment-tracking lineage — because for the roles I'm targeting, the higher-value signal was deployment judgment, not benchmark depth. So I wrote up how I'd actually roll this out at a regulated customer, including the data-sourcing problems I hit and how I fell back to known-good data. I made that call explicitly and logged it — that's the kind of scope decision I'd make on a real engagement."
+
+### Trade-offs
+- **Gain:** the project now speaks directly to the customer-facing role band; deployment judgment becomes a first-class artifact instead of a footnote; no spec churn.
+- **Lose:** thinner MLE/research-depth signal (experiment lineage, multi-model eval rigor). Acceptable while AI-PM/SA/FDE is the primary target; recoverable via the revisit trigger.
+
+### Revisit trigger
+At the Week 3 Sunday cut — decide then whether MLflow lineage + multi-LLM compare actually get demoted, based on real schedule pressure. Separately: if the search pivots back to MLE-primary, the demoted eval depth is the first thing to restore.
+
 ---
 
 ## Format notes for future entries

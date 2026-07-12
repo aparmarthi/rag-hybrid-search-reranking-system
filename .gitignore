@@ -231,3 +231,10 @@ logs/
 
 # Claude Code memory (private career strategy)
 memory/
+
+# Media — host externally (Loom/YouTube), link in README. Never commit >=50MB (CLAUDE.md rule).
+*.mp4
+*.mov
+
+# Editor
+.vscode/

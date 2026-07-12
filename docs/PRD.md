@@ -77,7 +77,7 @@ Full 20-item DoD in `docs/finsight_spec_v2.3.md`.
 | Haiku-then-Sonnet cost routing | Sonnet on every query | Intent classification is a 4-class problem — Haiku is 10× cheaper with < 100ms added latency |
 | Prompt caching | Fresh every call | 60–80% cost reduction on static system prompt + tool definitions; essential at $0.005/query target |
 | Qdrant | Pinecone / FAISS | Native hybrid BM25+dense in one index; free 1GB cloud tier; fastest metadata filtering |
-| 4-path router (earnings / metrics / price / news) | Monolithic retrieval | Per-source Recall@K story is an interview artifact worth the complexity |
+| 3-path router (earnings / metrics / risk_and_events) | Monolithic retrieval | Per-source Recall@K story is an interview artifact worth the complexity; OHLCV folded into Node 4, news path retired (decisions.md DEC-004) |
 | Evidence conflict detector | Answer-only RAG | Turns a Q&A tool into a product; the #1 interview moment |
 
 ## 7. NOT building
@@ -177,6 +177,13 @@ Full version will live in `docs/product_strategy.md` (written in Week 5 as part 
 - Adversarial suite as separate module (folded into golden set)
 - Multi-turn conversation memory compression
 
-## 14. Changelog
+## 14. Related interview artifacts
+
+- [decisions.md](decisions.md) — engineering war stories (DEC-001 … DEC-009).
+- [deployment-playbook.md](deployment-playbook.md) — how FinSight would be deployed at a regulated customer (the forward-deployed-engineer artifact).
+- [interview-positioning.md](interview-positioning.md) — how this project maps to the target role band (FDE / SA / Director / TPM / AI PM) and the trustworthy-AI framing.
+
+## 15. Changelog
 
 - **2026-04-29:** Initial PRD committed. Scoped to v2.3 (5-week interview-ready plan).
+- **2026-05-31:** Added pointers to deployment-playbook.md and interview-positioning.md; recorded eval-depth → deployment-judgment rebalance as decisions.md DEC-009.

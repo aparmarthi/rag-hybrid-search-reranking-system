@@ -1,8 +1,10 @@
-# FinSight — Multimodal Financial Evidence Engine
+# FinSight — Multi-Source Financial Evidence Engine
 
-**Production RAG system for investor-grade financial research.** Answers questions across SEC filings, earnings call transcripts, OHLCV market data, and financial news — with cited sources, calibrated conflict detection across sources, guardrails, and P95 latency under 3 seconds at under $0.005/query.
+**Production RAG system for investor-grade financial research.** Answers questions across three evidence sources — earnings call transcripts (text), SEC filings (structured fundamentals + 10-K risk factors), and OHLCV market data (time-series) — with cited sources, calibrated conflict detection across sources, guardrails, and P95 latency under 3 seconds at under $0.005/query.
 
-**Live demo:** *(deploying Week 1 — URL here by end of Week 1)*
+**Built to know what it doesn't know:** it refuses when it can't ground an answer, flags stale evidence, and surfaces contradictions between sources instead of confidently averaging them.
+
+**Live demo:** *(deploying Week 1 — URL here by end of Week 1)* — treated as a P0: the link must work flawlessly on first click, every time (no cold-start fumble in the first 30 seconds).
 **Demo video:** *(Loom walkthrough in Week 5)*
 **Status:** 🟦 Week 1 of 5 — scaffolding complete
 
@@ -12,7 +14,17 @@
 
 Equity analysts spend 3–4 hours per research report cross-referencing three disconnected sources: what management said on the earnings call, what the filing actually disclosed, and how the market reacted. When those sources disagree — Q2 guidance vs Q3 guidance, transcript revenue vs 10-Q revenue — today's workflow has no systematic way to surface the conflict.
 
-FinSight retrieves across all three modalities simultaneously, grounds every answer in cited sources, and flags when sources disagree. That last part — **evidence conflict detection** — turns this from a Q&A tool into a research product.
+FinSight retrieves across all three sources simultaneously, grounds every answer in cited sources, and flags when sources disagree. That last part — **evidence conflict detection** — turns this from a Q&A tool into a research product, and into a system that surfaces contradictions instead of confidently averaging them.
+
+### Business value
+
+In a regulated environment (SEC Rule 10b-5 liability on any numeric claim), a confident-but-wrong number is worse than a refusal — so the trust gates *are* the product:
+
+- **Analyst value:** ~3 hrs/day saved × $200/hr × 20 days ≈ **$12K/month** of analyst time per seat.
+- **Pricing:** $500/mo per seat (≈2.5% of a Bloomberg Terminal) → **~24× ROI** at the point of sale.
+- **Unit economics:** ~$0.005/query × 50 queries/day × 20 days ≈ **$5/month cost** → **~99% gross margin**.
+
+Full model and ICP in [docs/PRD.md](docs/PRD.md) §10.
 
 ---
 
@@ -25,9 +37,9 @@ Input guardrails (PII + jailbreak)
    ↓
 ┌──────────────── LangGraph 6-node pipeline ────────────────┐
 │ 1. Query Understanding  (Claude Sonnet, prompt-cached)    │
-│ 2. Router              (Claude Haiku, 4-path classifier)  │
+│ 2. Router              (Claude Haiku, 3-path classifier)  │
 │ 3. Retriever           (Qdrant hybrid + Cohere Rerank)    │
-│ 4. Context Builder     (DuckDB JOIN on ticker + period)   │
+│ 4. Context Builder     (DuckDB JOIN + OHLCV event window) │
 │ 5. Generator + Conflict Detector  (Sonnet streaming)      │
 │ 6. Output Guardrails + Failure Mode Logger                │
 └───────────────────────────────────────────────────────────┘
@@ -50,7 +62,7 @@ Full architecture diagram in `docs/architecture.md`.
 | Fallback reranker | ms-marco-MiniLM-L-6-v2 | Local cross-encoder for Cohere-outage degradation |
 | Orchestration | LangGraph | Stateful 6-node DAG with conditional branching; per-node LangSmith tracing |
 | Primary LLM | Claude Sonnet 4.6 | Best citation-format enforcement; structured tool use |
-| Router LLM | Claude Haiku 4.5 | 10× cheaper for 4-class intent classification |
+| Router LLM | Claude Haiku 4.5 | 10× cheaper for 3-class intent classification (earnings / metrics / risk_and_events) |
 | Prompt caching | Anthropic | ~60–80% cost reduction on static system prompt + tool defs |
 | Structured outputs | Claude tool use + Pydantic | Citations and conflicts are schema-validated, not regex-parsed |
 | Structured store | DuckDB | Columnar, 10–50× faster than Postgres/SQLite for OHLCV + fundamentals |
@@ -65,15 +77,16 @@ Full architecture diagram in `docs/architecture.md`.
 
 ## Data sources
 
-4 datasets across 4 modalities + 1 golden eval set:
+3 evidence sources (text + structured + time-series) + 1 golden eval set:
 
-| Modality | Dataset | Use |
+| Source | Dataset | Use |
 |---|---|---|
-| Earnings call transcripts | [Motley Fool scraped transcripts (Kaggle: tpotterer)](https://www.kaggle.com/datasets/tpotterer/motley-fool-scraped-earnings-call-transcripts) | Primary retrieval corpus. Conflict detector Source A |
-| SEC structured filings | [SEC Financial Statement Data Sets (EDGAR XBRL)](https://www.sec.gov/data-research/sec-markets-data/financial-statement-data-sets) | DuckDB fundamentals. Conflict detector Source B |
-| OHLCV prices | [Jackson Crow stock market dataset (Kaggle)](https://www.kaggle.com/datasets/jacksoncrow/stock-market-dataset) | `price_action` routing path. Event-window context |
-| Market news | [Aaron7sun stock news (Kaggle)](https://www.kaggle.com/datasets/aaron7sun/stocknews) | `news_sentiment` routing path. Temporal context |
+| Earnings call transcripts (text) | [Motley Fool scraped transcripts (Kaggle: tpotterer)](https://www.kaggle.com/datasets/tpotterer/motley-fool-scraped-earnings-call-transcripts) | `earnings_analysis` retrieval corpus. Conflict detector Source A |
+| SEC filings (structured + risk text) | [SEC Financial Statement Data Sets (EDGAR XBRL)](https://www.sec.gov/data-research/sec-markets-data/financial-statement-data-sets) | `financial_metrics` (DuckDB fundamentals, conflict detector Source B) + `risk_and_events` (10-K Item 1A risk factors, 8-K events) |
+| OHLCV prices (time-series) | [Jackson Crow stock market dataset (Kaggle)](https://www.kaggle.com/datasets/jacksoncrow/stock-market-dataset) | Node 4 universal context — event-window price moves for any path. Not its own router path (see decisions.md DEC-004) |
 | Golden eval | Hand-curated | 50 queries + 20+20 conflict pairs + 5 adversarial + 5 abstention |
+
+**Router paths:** `earnings_analysis` · `financial_metrics` · `risk_and_events`. The earlier `price_action` and `news_sentiment` paths were retired — OHLCV became universal Node-4 context and the Reddit-sourced news dataset was the wrong granularity (full rationale in [docs/decisions.md](docs/decisions.md) DEC-004).
 
 **Data licensing note:** Motley Fool dataset is hosted on Kaggle under unclear commercial redistribution terms. For public demo deployment, we scope retrieval to SEC-only mode if licensing is ambiguous. See `docs/decisions.md`.
 
@@ -201,9 +214,11 @@ finsight/
 ├── ui/                      # Streamlit 5-tab demo
 ├── evals/                   # Golden queries, conflict pairs, results
 ├── docs/
-│   ├── PRD.md               # Problem, users, metrics, trade-offs
+│   ├── PRD.md               # Problem, users, metrics, trade-offs, ROI
 │   ├── architecture.md      # Diagrams, state schema, module boundaries
 │   ├── decisions.md         # Engineering war stories — interview artifact
+│   ├── deployment-playbook.md   # How I'd deploy this at a regulated customer (FDE artifact)
+│   ├── interview-positioning.md # Role → question → artifact map
 │   └── finsight_spec_v2.3.md  # Canonical spec
 ├── tests/
 ├── .github/workflows/       # eval.yml + lint.yml
@@ -223,7 +238,7 @@ finsight/
 - **Week 4** — Production polish + related-tickers recs + load test + guardrails visible
 - **Week 5** — Demo polish, Loom video, blog post, `decisions.md` finalized
 
-Full plan: `docs/finsight_spec_v2.3.md`.
+Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this project maps to specific roles — and how I'd deploy it at a real customer — is in [docs/interview-positioning.md](docs/interview-positioning.md) and [docs/deployment-playbook.md](docs/deployment-playbook.md).
 
 ---
 
