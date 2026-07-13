@@ -23,7 +23,14 @@ from functools import lru_cache
 from langgraph.graph import END, START, StateGraph
 
 from src.retrieval.graph_state import FinSightState
-from src.retrieval.nodes import generate, query_understanding, rerank, retrieve, router
+from src.retrieval.nodes import (
+    detect_conflicts,
+    generate,
+    query_understanding,
+    rerank,
+    retrieve,
+    router,
+)
 from src.utils.config import settings
 from src.utils.logging import get_logger
 
@@ -47,13 +54,15 @@ def _compiled():
     g.add_node("router", router)
     g.add_node("retrieve", retrieve)
     g.add_node("rerank", rerank)
+    g.add_node("detect_conflicts", detect_conflicts)
     g.add_node("generate", generate)
 
     g.add_edge(START, "query_understanding")
     g.add_edge("query_understanding", "router")
     g.add_edge("router", "retrieve")
     g.add_edge("retrieve", "rerank")
-    g.add_edge("rerank", "generate")
+    g.add_edge("rerank", "detect_conflicts")
+    g.add_edge("detect_conflicts", "generate")
     g.add_edge("generate", END)
 
     return g.compile()

@@ -63,6 +63,7 @@ class QueryResponse(BaseModel):
     rewritten_query: str | None = None
     staleness_flag: bool = False
     temporal_reference: dict | None = None
+    conflicts: list[dict] = []
     citations: list[CitationOut]
     chunks: list[ChunkOut]
     latency_ms: int
@@ -155,6 +156,7 @@ def query(req: QueryRequest) -> QueryResponse:
         rewritten_query=state.get("rewritten_query"),
         staleness_flag=state.get("staleness_flag", False),
         temporal_reference=state.get("temporal_reference"),
+        conflicts=state.get("conflicts", []),
         citations=[
             CitationOut(chunk_number=c.chunk_number, source_label=c.source_label)
             for c in state.get("citations", [])
@@ -184,34 +186,47 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
     `done` event carrying citations, chunks, and metrics.
     """
     def events():
+        # Run the pipeline's pre-generation nodes (query-understanding → router →
+        # retrieve → rerank → conflict detection) so the stream carries the same
+        # routing / staleness / conflict metadata as /query, then stream generation.
+        from src.retrieval.nodes import (
+            detect_conflicts, query_understanding, rerank, retrieve, router, _generator,
+        )
+
         start = time.perf_counter()
-        chunks = _retrieve_and_rerank(req.question, req.top_k)
-        for ev in _generator().generate_stream(req.question, chunks):
+        state: dict = {"raw_query": req.question, "top_k": req.top_k}
+        for node in (query_understanding, router, retrieve, rerank, detect_conflicts):
+            state.update(node(state))
+        chunks = state.get("reranked", [])
+        query = state.get("rewritten_query") or req.question
+
+        for ev in _generator().generate_stream(query, chunks):
             if ev["type"] == "token":
                 yield f"event: token\ndata: {json.dumps({'text': ev['text']})}\n\n"
             elif ev["type"] == "done":
                 ans = ev["answer"]
                 payload = {
                     "grounded": ans.grounded,
+                    "routing_path": state.get("routing_path"),
+                    "rewritten_query": state.get("rewritten_query"),
+                    "staleness_flag": state.get("staleness_flag", False),
+                    "temporal_reference": state.get("temporal_reference"),
+                    "conflicts": state.get("conflicts", []),
                     "citations": [
                         {"chunk_number": c.chunk_number, "source_label": c.source_label}
                         for c in ans.citations
                     ],
                     "chunks": [
                         {
-                            "chunk_id": c.chunk_id,
-                            "ticker": c.ticker,
-                            "doc_type": c.doc_type,
-                            "date": c.date,
-                            "score": round(c.score, 4),
-                            "text": c.text[:600],
+                            "chunk_id": c.chunk_id, "ticker": c.ticker, "doc_type": c.doc_type,
+                            "date": c.date, "score": round(c.score, 4), "text": c.text[:600],
                         }
                         for c in chunks
                     ],
                     "latency_ms": int((time.perf_counter() - start) * 1000),
+                    "latency_per_node_ms": state.get("latency_ms"),
                     "tokens": {
-                        "input": ans.input_tokens,
-                        "output": ans.output_tokens,
+                        "input": ans.input_tokens, "output": ans.output_tokens,
                         "cache_read": ans.cache_read_tokens,
                     },
                 }

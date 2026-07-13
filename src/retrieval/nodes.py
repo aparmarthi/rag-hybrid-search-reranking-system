@@ -60,6 +60,13 @@ def _generator() -> Generator:
     return Generator()
 
 
+@lru_cache(maxsize=1)
+def _conflict_detector():
+    from src.insight.conflict_detector import ConflictDetector
+
+    return ConflictDetector()
+
+
 # ---- Node 1: Query Understanding (Haiku) ----
 _QU_TOOL = {
     "name": "understood_query",
@@ -247,6 +254,44 @@ def rerank(state: FinSightState) -> dict:
     top = top[:k]
     lat = {**state.get("latency_ms", {}), "rerank": int((time.perf_counter() - t) * 1000)}
     return {"reranked": top, "staleness_flag": stale, "latency_ms": lat}
+
+
+# Query signals that make conflict detection worth its (~14s) extraction call.
+_CONFLICT_INTENT = (
+    "guidance", "guided", "outlook", "forecast", "versus", " vs", "compare",
+    "consistent", "match", "matched", "revised", "raise", "raised", "lower",
+    "lowered", "cut", "contradict", "conflict", "discrepan", "differ", "change",
+)
+
+
+def _wants_conflict_check(query: str) -> bool:
+    q = query.lower()
+    return any(sig in q for sig in _CONFLICT_INTENT)
+
+
+# ---- Node 4b: Conflict Detection (the differentiator) ----
+def detect_conflicts(state: FinSightState) -> dict:
+    """Scan reranked evidence for contradictory numeric claims (guidance vs actual,
+    cross-quarter drift). Gated on query intent — the extraction call is ~14s, so
+    we only run it for comparison/guidance-oriented queries. Precision-gated and
+    never breaks the answer: any failure yields no conflicts."""
+    t = time.perf_counter()
+    conflicts = []
+    query = state.get("rewritten_query") or state.get("raw_query", "")
+    if not _wants_conflict_check(query):
+        return {"conflicts": [], "latency_ms": {**state.get("latency_ms", {}), "detect_conflicts": 0}}
+    try:
+        found = _conflict_detector().detect(state.get("reranked", []))
+        conflicts = [
+            {"metric": c.metric, "subject": c.claim_a.subject, "explanation": c.explanation,
+             "value_a": c.claim_a.value, "value_b": c.claim_b.value,
+             "period_a": c.claim_a.period, "period_b": c.claim_b.period}
+            for c in found
+        ]
+    except Exception as e:  # noqa: BLE001
+        log.warning("conflict detection failed (%s); none surfaced", type(e).__name__)
+    lat = {**state.get("latency_ms", {}), "detect_conflicts": int((time.perf_counter() - t) * 1000)}
+    return {"conflicts": conflicts, "latency_ms": lat}
 
 
 # ---- Node 5: Generate ----

@@ -35,6 +35,9 @@ class FinSightState(TypedDict, total=False):
     reranked: list[RetrievedChunk]
     staleness_flag: bool          # top evidence far from the query's referenced period
 
+    # ----- Node 4b: Conflict Detection (differentiator) -----
+    conflicts: list[dict]         # contradictory numeric claims in the evidence
+
     # ----- Node 5: Generate -----
     answer: str
     citations: list[Citation]

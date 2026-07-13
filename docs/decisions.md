@@ -232,8 +232,67 @@ Week 3 ablation quantifies the rerank lift (no-rerank vs Cohere vs local). If Co
 
 ---
 
-## DEC-007 (placeholder for Week 3)
-**Topic:** Conflict detector threshold calibration — how we learned per-metric thresholds from 20+20 labeled pairs instead of hand-tuning.
+## DEC-007: Evidence Conflict Detector — intra-transcript, precision-gated, intent-gated
+**Date:** 2026-07-12 (Week 3)
+
+### Context
+The differentiator: surface contradictory numeric claims in the evidence instead
+of blending them into one confident answer. The spec's canonical design compares
+a transcript claim (Source A) vs an SEC XBRL filing (Source B). **Source B isn't
+available** — only HTML filings were downloaded (no XBRL numbers), and the
+`fundamentals` table is empty. So Week 3 builds the **intra-transcript** version:
+guidance-vs-actual and cross-quarter drift within the transcript corpus. Same
+engine; cross-source is later just "add SEC numbers to the claim set."
+
+### Engine (two steps, source-agnostic)
+1. **Extract** — one Sonnet structured-tool call over the evidence emits
+   `NumericClaim`s (metric, **subject**, value, unit, period, is_guidance, chunk,
+   quote). LLM extraction beats regex for numbers-in-prose.
+2. **Compare** — pairwise, flag divergence beyond a per-metric threshold
+   (revenue >3%, EPS >5%, margin >1pp, growth/guidance >2pp).
+
+### The precision story (this is the interview-worthy part)
+Naive comparison produced **false positives**; each gate below removed a class,
+learned by inspecting real output rather than hand-waving:
+- **Guidance ranges** ("down 15% to down 18%") → two claims from the SAME chunk.
+  Gate: both claims must come from **different chunks**.
+- **Quarter vs full-year** (Q3 18.5% vs FY 21%) → not a contradiction, different
+  scope. Gate: **comparable periods** (same period, or guidance→actual for it).
+- **Different segments** (Products +8% vs Services +17%, same call) → same metric
+  label, different thing. Gate: added a **`subject`** field; require subject match.
+- **Same-call figures** → a real conflict is guidance in one call vs actual in a
+  **later** call. Gate: the two chunks must be from **different dates**.
+
+Verified: a constructed genuine conflict (NVDA guided 15% for Q3, delivered 9%)
+**fires** correctly; a control (data-center 15% vs gaming 9%, different subjects)
+**does not**. Zero false positives across the earlier noisy queries after gating.
+
+### Intent gating (latency)
+The extraction call adds ~14-20s. Most queries have no conflict to find, so the
+node only runs when the query is comparison/guidance-oriented (keyword gate:
+"guidance", "versus", "match", "revised", …). Plain queries skip it (0ms);
+comparison queries pay the cost for the differentiator. No extra LLM call to decide.
+
+### Honest limitation — the retrieval-pairing gap
+The detector is correct, but **standard retrieval doesn't reliably fetch both
+halves of a conflict pair** (a ticker's guidance chunk AND its later-actual chunk)
+into the same result set — so live queries surface conflicts less often than the
+engine can detect. The engine is proven on paired evidence; a conflict-oriented
+retrieval mode (deliberately fetch a ticker's guidance + subsequent actuals) is
+the follow-on. Documented rather than hidden — better to say "the detector is
+right; the retrieval that feeds it needs a conflict-aware mode" than to fake it.
+
+### Trade-offs
+- **Gain:** a real, precision-first conflict detector with a genuine "here's how I
+  killed each false-positive class" debugging narrative — stronger than a detector
+  that fires often but cries wolf.
+- **Lose:** cross-source (transcript vs filing) deferred; live recall limited by the
+  retrieval-pairing gap.
+
+### Revisit trigger
+(1) Ingest SEC XBRL → cross-source conflicts. (2) Add conflict-oriented retrieval
+so live queries reliably surface both halves. (3) Week-3 calibration: the spec's
+20+20 labeled-pair threshold tuning, once a labeled set exists.
 
 ---
 

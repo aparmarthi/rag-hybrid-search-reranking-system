@@ -88,10 +88,23 @@ if st.button("Search", type="primary") and question.strip():
         st.warning("Stream ended without a final result.")
         st.stop()
 
-    if done["grounded"]:
-        st.success("Grounded ✓")
-    else:
-        st.warning("Abstained — evidence did not support a confident answer")
+    # Status badges
+    cols = st.columns(3)
+    cols[0].success("Grounded ✓") if done["grounded"] else cols[0].warning("Abstained")
+    if done.get("routing_path"):
+        cols[1].info(f"Path: {done['routing_path']}")
+    if done.get("staleness_flag"):
+        cols[2].warning("⏳ Stale — evidence far from the queried period")
+
+    # ⚠️ Evidence conflicts — the differentiator
+    conflicts = done.get("conflicts", [])
+    if conflicts:
+        st.markdown("### ⚠️ Evidence conflicts detected")
+        for c in conflicts:
+            st.error(
+                f"**{c['metric']}** ({c.get('subject','')}): "
+                f"{c['explanation']}"
+            )
 
     # Citations
     if done["citations"]:
@@ -103,7 +116,7 @@ if st.button("Search", type="primary") and question.strip():
     m1, m2, m3 = st.columns(3)
     m1.metric("Latency", f"{done['latency_ms']} ms")
     m2.metric("Output tokens", done["tokens"]["output"])
-    m3.metric("Cache-read tokens", done["tokens"]["cache_read"])
+    m3.metric("Conflicts", len(conflicts))
 
     # Evidence chunks
     st.markdown("### Retrieved evidence")
