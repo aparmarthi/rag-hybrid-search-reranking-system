@@ -80,7 +80,7 @@ def run(limit: int | None = None, batch: int = 64, resume: bool = True) -> int:
         vectors = embedder.embed_documents(texts)
 
         points = []
-        for r, vec in zip(window, vectors):
+        for r, vec in zip(window, vectors, strict=False):
             cid = r[0]
             points.append(
                 qm.PointStruct(

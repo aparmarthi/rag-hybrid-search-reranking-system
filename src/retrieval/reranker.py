@@ -32,8 +32,9 @@ log = get_logger(__name__)
 
 @lru_cache(maxsize=1)
 def _cohere_client():
-    import certifi
     import os
+
+    import certifi
 
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
     import cohere
@@ -87,7 +88,7 @@ class Reranker:
         try:
             model = _local_cross_encoder()
             scores = model.predict([(query, c.text) for c in chunks])
-            ranked = sorted(zip(chunks, scores), key=lambda x: x[1], reverse=True)
+            ranked = sorted(zip(chunks, scores, strict=False), key=lambda x: x[1], reverse=True)
             out = []
             for chunk, score in ranked[:k]:
                 chunk.score = float(score)

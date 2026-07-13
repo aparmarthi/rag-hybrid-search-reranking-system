@@ -93,7 +93,7 @@ def main() -> None:
         }, f, indent=2)
 
     print(f"\nWrote {len(universe)} tickers to {OUTPUT}")
-    print(f"\nTop 20 by transcript count:")
+    print("\nTop 20 by transcript count:")
     for entry in universe[:20]:
         print(f"  {entry['ticker']:6s}  n={entry['transcript_count']:3d}  "
               f"{entry['first_transcript']} to {entry['last_transcript']}")

@@ -243,7 +243,7 @@ class ConflictDetector:
         if pa is None or pb is None:
             # If we can't parse a period, only allow the guidance-vs-actual case
             return a.is_guidance != b.is_guidance
-        (ya, qa), (yb, qb) = pa, pb
+        (_, qa), (_, qb) = pa, pb
         # Quarter vs full-year (one has a quarter, the other doesn't) → not comparable
         if (qa is None) != (qb is None):
             return False

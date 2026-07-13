@@ -113,7 +113,7 @@ def load(replace: bool = False) -> int:
 
     # Parse dates + quarters
     df["parsed_date"] = df["date"].map(_parse_date)
-    df["fiscal_year"], df["fiscal_quarter"] = zip(*df["q"].map(_parse_quarter))
+    df["fiscal_year"], df["fiscal_quarter"] = zip(*df["q"].map(_parse_quarter), strict=False)
 
     # Drop rows where core fields failed to parse
     before = len(df)

@@ -20,9 +20,9 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.generation.generator import Generator
 from src.indexing.qdrant_client import collection_stats, get_client
 from src.retrieval.retriever import Retriever
-from src.generation.generator import Generator
 from src.utils.config import settings
 from src.utils.logging import get_logger
 
@@ -89,7 +89,7 @@ def _generator() -> Generator:
 
 
 @lru_cache(maxsize=1)
-def _reranker() -> "Reranker":
+def _reranker():
     from src.retrieval.reranker import Reranker
 
     return Reranker()
@@ -97,7 +97,6 @@ def _reranker() -> "Reranker":
 
 def _retrieve_and_rerank(question: str, top_k: int):
     """Hybrid retrieve a candidate pool, then rerank down to top_k."""
-    from src.utils.config import settings
 
     candidates = _retriever().search(question, top_k=max(settings.rerank_candidate_k, top_k))
     return _reranker().rerank(question, candidates, top_k=top_k)
@@ -190,7 +189,12 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
         # retrieve → rerank → conflict detection) so the stream carries the same
         # routing / staleness / conflict metadata as /query, then stream generation.
         from src.retrieval.nodes import (
-            detect_conflicts, query_understanding, rerank, retrieve, router, _generator,
+            _generator,
+            detect_conflicts,
+            query_understanding,
+            rerank,
+            retrieve,
+            router,
         )
 
         start = time.perf_counter()

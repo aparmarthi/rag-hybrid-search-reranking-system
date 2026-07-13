@@ -44,8 +44,9 @@ class VoyageEmbedder:
     """voyage-finance-2 via API. Distinguishes doc vs query input_type."""
 
     def __init__(self) -> None:
-        import certifi
         import os
+
+        import certifi
 
         # Ensure TLS verifies under Homebrew Python (see DEC-010).
         os.environ.setdefault("SSL_CERT_FILE", certifi.where())

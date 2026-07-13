@@ -17,7 +17,6 @@ classification/rewrite, expensive Sonnet only for final synthesis.
 """
 from __future__ import annotations
 
-import json
 import time
 from functools import lru_cache
 

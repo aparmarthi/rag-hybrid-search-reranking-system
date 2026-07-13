@@ -61,7 +61,7 @@ def run(use_cloud: bool = False, limit: int | None = None, batch: int = 128) -> 
                     id=p.id,
                     vector={"bm25": qm.SparseVector(indices=idx, values=val)},
                 )
-                for p, (idx, val) in zip(points, sparse_vecs)
+                for p, (idx, val) in zip(points, sparse_vecs, strict=False)
             ],
         )
         total += len(points)

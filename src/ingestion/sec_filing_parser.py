@@ -29,7 +29,6 @@ import json
 import re
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 import duckdb
 from bs4 import BeautifulSoup
@@ -241,7 +240,6 @@ def load(replace: bool = False, ticker_filter: str | None = None) -> int:
                         continue
 
                     if not sections:
-                        key = f"{form}:{accession}"
                         missing_sections[form] = missing_sections.get(form, 0) + 1
                         continue
 
@@ -282,7 +280,6 @@ def load(replace: bool = False, ticker_filter: str | None = None) -> int:
                     if rows_to_insert:
                         # Update documents table with section column
                         for row in rows_to_insert:
-                            section_slug = json.loads(row[11])["section_slug"]
                             conn.execute(
                                 """
                                 INSERT INTO documents

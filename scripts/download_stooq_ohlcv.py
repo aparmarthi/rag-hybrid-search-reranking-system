@@ -28,10 +28,8 @@ Jackson Crow data (ends 2020-04) and accept reduced overlap window. Documented i
 from __future__ import annotations
 
 import json
-import shutil
 import sys
 import tempfile
-import time
 import zipfile
 from pathlib import Path
 
@@ -58,8 +56,8 @@ def load_universe() -> list[str]:
 
 def main() -> None:
     try:
-        import requests
         import pandas as pd  # noqa: F401
+        import requests
     except ImportError as e:
         print(f"ERROR: {e}. Install requirements: pip install -r requirements.txt")
         sys.exit(1)
@@ -75,7 +73,7 @@ def main() -> None:
     else:
         print(f"Downloading Stooq US daily bulk (~200MB to {zip_tmp})...")
         print(f"  URL: {STOOQ_US_DAILY_URL}")
-        print(f"  NOTE: Stooq occasionally rate-limits. If this fails, retry in a few min.")
+        print("  NOTE: Stooq occasionally rate-limits. If this fails, retry in a few min.")
         try:
             r = requests.get(
                 STOOQ_US_DAILY_URL,
@@ -124,7 +122,7 @@ def main() -> None:
                 with zf.open(archive_name) as member:
                     raw = member.read().decode("utf-8", errors="replace")
                 # Normalize to Jackson Crow schema
-                lines = [l for l in raw.splitlines() if l and not l.startswith("<")]
+                lines = [ln for ln in raw.splitlines() if ln and not ln.startswith("<")]
                 # Stooq CSV body: TICKER,PER,DATE,TIME,OPEN,HIGH,LOW,CLOSE,VOL,OPENINT
                 out_rows = ["Date,Open,High,Low,Close,Volume"]
                 for line in lines:

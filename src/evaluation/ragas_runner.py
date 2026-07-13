@@ -33,7 +33,6 @@ RESULTS = settings.repo_root / "evals" / "results" / "ragas.json"
 def _judge_llm():
     """Claude as the RAGAS judge (not OpenAI). Pinned to the public API + certifi."""
     import certifi
-    import httpx
     from langchain_anthropic import ChatAnthropic
     from ragas.llms import LangchainLLMWrapper
 

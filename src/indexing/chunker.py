@@ -25,7 +25,6 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-
 ChunkStrategy = Literal["fixed_400", "sentence", "paragraph"]
 
 

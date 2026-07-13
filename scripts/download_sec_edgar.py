@@ -35,7 +35,6 @@ import json
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urljoin
 
 REPO_ROOT = Path(__file__).parent.parent
 UNIVERSE_PATH = REPO_ROOT / "artifacts" / "ticker_universe.json"

@@ -79,10 +79,11 @@ def _build_collection(name: str, docs: list[dict], strategy: str, embedder) -> N
         if not batch_texts:
             return
         vecs = embedder.embed_documents(batch_texts)
-        for (m, txt), v in zip(batch_meta, vecs):
+        for (m, txt), v in zip(batch_meta, vecs, strict=False):
             points.append(qm.PointStruct(id=str(uuid.uuid4()), vector={"dense": v},
                                          payload={**m, "text": txt}))
-        batch_texts.clear(); batch_meta.clear()
+        batch_texts.clear()
+        batch_meta.clear()
 
     for d in docs:
         for ch in chunk_text(d["text"], strategy=strategy, max_tokens=600, overlap_tokens=80):
@@ -139,7 +140,8 @@ def run(max_docs: int = 60) -> dict:
         for s in STRATEGIES:
             for cid, txt in runs[s]:
                 if cid not in seen:
-                    seen.add(cid); pool.append(_C(cid, txt))
+                    seen.add(cid)
+                    pool.append(_C(cid, txt))
         relevant = _judge_relevance(g["query"], pool)
         for s in STRATEGIES:
             ids = [cid for cid, _ in runs[s]]

@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [".venv", "data", "qdrant_storage", "mlruns", "notebooks"]
+
+[tool.ruff.lint]
+# Pragmatic set: pyflakes (F), pycodestyle errors (E), imports (I), bugbear (B).
+select = ["F", "E", "I", "B"]
+ignore = [
+    "E501",   # line length handled by formatter, not enforced hard
+    "B008",   # function calls in defaults (FastAPI/pydantic idiom)
+]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+# Unit tests only by default; eval/integration tests are opt-in (they hit APIs).
+addopts = "-q"

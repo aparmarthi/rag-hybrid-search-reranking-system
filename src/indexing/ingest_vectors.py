@@ -35,14 +35,12 @@ import uuid
 from datetime import datetime, timezone
 
 import duckdb
-from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
-from src.indexing.chunker import Chunk, ChunkStrategy, chunk_text
+from src.indexing.chunker import ChunkStrategy, chunk_text
 from src.indexing.embedder import get_embedder
 from src.indexing.qdrant_client import COLLECTION_NAME, ensure_collection, get_client
 from src.ingestion.schema import init_db
-from src.utils.config import settings
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -112,7 +110,7 @@ def _fetch_documents(
 
     rows = conn.execute(query, params).fetchall()
     columns = ["doc_id", "ticker", "doc_type", "date", "fiscal_year", "fiscal_quarter", "metadata"]
-    return [dict(zip(columns, r)) for r in rows]
+    return [dict(zip(columns, r, strict=False)) for r in rows]
 
 
 def _extract_raw_text(doc: dict) -> tuple[str, str | None]:
@@ -203,7 +201,7 @@ def run(
             duckdb_rows = []
             qdrant_points = []
 
-            for chunk, vector in zip(chunks, vectors):
+            for chunk, vector in zip(chunks, vectors, strict=False):
                 chunk_id = f"{doc['doc_id']}_c{chunk.chunk_index}"
                 point_id = _chunk_id_to_uuid(chunk_id)
 
