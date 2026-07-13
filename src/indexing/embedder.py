@@ -112,6 +112,32 @@ class BgeM3Embedder:
         return "bge-m3"
 
 
+class SparseEmbedder:
+    """BM25 sparse vectors via fastembed (Qdrant/bm25). Statistical model, light
+    at runtime (~73MB onnxruntime). Used for the sparse leg of hybrid retrieval.
+
+    Returns (indices, values) tuples — Qdrant SparseVector format. Document vs
+    query use the same BM25 encoding (unlike dense, BM25 has no input_type)."""
+
+    def __init__(self) -> None:
+        from fastembed import SparseTextEmbedding
+
+        self._model = SparseTextEmbedding(model_name="Qdrant/bm25")
+
+    def embed_documents(self, texts: list[str]) -> list[tuple[list[int], list[float]]]:
+        return [(e.indices.tolist(), e.values.tolist()) for e in self._model.embed(texts)]
+
+    def embed_query(self, text: str) -> tuple[list[int], list[float]]:
+        e = next(iter(self._model.query_embed(text)))
+        return e.indices.tolist(), e.values.tolist()
+
+
+@lru_cache(maxsize=1)
+def get_sparse_embedder() -> SparseEmbedder:
+    log.info("Loading BM25 sparse embedder (Qdrant/bm25)")
+    return SparseEmbedder()
+
+
 @lru_cache(maxsize=1)
 def get_embedder() -> Embedder:
     backend = settings.embedding_backend.lower()

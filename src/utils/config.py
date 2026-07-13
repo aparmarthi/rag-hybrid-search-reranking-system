@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # False on deploy (Qdrant Cloud payload carries full text → no DuckDB needed).
     use_duckdb_hydration: bool = Field(False)
 
+    # Retrieval mode: "dense" (Week-1 baseline) or "hybrid" (BM25+dense RRF).
+    # Requires BM25 sparse vectors populated (scripts/add_sparse_vectors.py).
+    retrieval_mode: str = Field("hybrid")
+
     # ----- App config -----
     env: str = Field("development")
     log_level: str = Field("INFO")
