@@ -200,8 +200,35 @@ None for v2.3. If a target interview specifically asks about real-time data, poi
 
 ---
 
-## DEC-006 (placeholder for Week 2)
-**Topic:** Cohere Rerank 3.5 vs local ms-marco-MiniLM cross-encoder. Will populate after implementing both in Week 2.
+## DEC-006: Cohere Rerank 3.5 primary + local ms-marco cross-encoder fallback
+**Date:** 2026-07-12 (Week 2)
+
+### Context
+Stage 2 of retrieval: after hybrid BM25+dense fetches a candidate pool (recall-oriented), a cross-encoder re-scores each candidate against the query jointly (precision-oriented) and reorders the top-k. Two viable rerankers: Cohere's managed Rerank API, or a self-hosted cross-encoder.
+
+### Options considered
+| Option | Quality | Latency | Ops | Cost |
+|---|---|---|---|---|
+| Cohere Rerank 3.5 (`rerank-v3.5`) | Strong, managed | ~150ms | Zero (API) | <$0.001/query |
+| ms-marco-MiniLM-L-6-v2 (local cross-encoder) | Good | CPU-bound, slower | Model in process (~90MB) | Free |
+
+### Decision
+Cohere `rerank-v3.5` primary; ms-marco-MiniLM-L-6-v2 as an automatic fallback. `reranker.py` catches ANY Cohere error and degrades to the local cross-encoder rather than failing the query; a further failure falls back to raw retrieval order. Config `reranker_backend` also offers `none` (pass-through) for the ablation baseline.
+
+### Rationale
+1. **Managed quality, zero GPU ops** — reranking is where a cross-encoder's joint query-doc scoring adds precision the bi-encoder retrieval can't. Cohere delivers that without hosting a model in the 512MB free-tier serve process.
+2. **Deploy-friendly** — Cohere is an API call; no model in the web dyno (same reason we chose Voyage for embeddings).
+3. **The fallback is the resilience story** — "Cohere outage → local cross-encoder → raw order" is a graceful-degradation chain I can point to in interviews, and it's tested (it fired live during the model-name bug below and reranked correctly).
+
+### The model-name gotcha (a real debugging note)
+The v2.3 spec named the model `rerank-english-v3.5`. That returns **404 model not found** — Cohere dropped the `-english` suffix (v3.5 is multilingual). The correct ID is **`rerank-v3.5`**. I discovered this by probing the API for candidate names rather than guessing, and also confirmed **no Rerank 4 exists yet** (all `rerank-v4.0` variants 404). A stale `COHERE_RERANK_MODEL` in `.env` masked the fix at first — the env var overrode the corrected code default. Lesson: verify model IDs against the live API, and check `.env` overrides when a config change "doesn't take."
+
+### Trade-offs
+- **Gain:** best rerank quality with no GPU ops; free-tier-deployable; a real degradation chain.
+- **Lose:** per-query Cohere dependency (mitigated by the local fallback) and a tiny cost (<$0.001/query).
+
+### Revisit trigger
+Week 3 ablation quantifies the rerank lift (no-rerank vs Cohere vs local). If Cohere's lift over the local cross-encoder is marginal, reconsider going local-only to drop the dependency. Adopt Rerank 4 when/if it ships (one-line config change).
 
 ---
 
@@ -248,6 +275,31 @@ Option C.
 
 ### Revisit trigger
 If Anthropic access is ever unavailable for a live demo, the documented fallback is OpenRouter for generation (accepting the loss of native caching/tool-use) — a graceful-degradation story, not the default.
+
+---
+
+## DEC-013: Native server-side hybrid (BM25+dense RRF) + a linear LangGraph pipeline
+**Date:** 2026-07-12 (Week 2)
+
+### Context
+Two Week-2 architecture choices: (1) how to do hybrid BM25+dense retrieval, and (2) how to orchestrate the query flow (query-understanding → router → retrieve → rerank → generate).
+
+### Decision 1 — hybrid retrieval
+Use Qdrant's **native server-side RRF fusion** in one query: two `Prefetch` legs (dense voyage-finance-2 + sparse BM25) fused by `FusionQuery(Fusion.RRF)`. BM25 sparse vectors generated with `fastembed` (`Qdrant/bm25`, a statistical model — onnxruntime ~73MB, fits the free tier). Sparse vectors added to all 15,023 points (local + cloud) via `scripts/add_sparse_vectors.py`. Dense-only mode retained (`retrieval_mode` config) for the Week-3 ablation.
+
+**Rationale:** This is the DEC-002 "native hybrid in one query" story made real — no client-side fusion, no second round-trip, one call returns RRF-ranked results. It's the reason Qdrant was chosen over Pinecone (which needs separate sparse/dense indexes fused client-side).
+
+### Decision 2 — LangGraph pipeline
+Wrap the flow in a compiled `StateGraph` (`graph.py`) with a shared `FinSightState` TypedDict and five node functions (`nodes.py`). The router and query-understanding nodes use **Haiku** (cheap classification/rewrite); only generation uses **Sonnet** — the cost-routing story in concrete per-node latencies (Haiku ~700-900ms vs Sonnet generate ~5-8s). LangSmith tracing auto-enabled → per-node spans.
+
+**Why linear (not conditional branching) for Week 2:** the router classifies into 3 paths, but `financial_metrics` and `risk_and_events` need the SEC corpus, which isn't ingested yet. So all paths currently retrieve from the transcript corpus, and non-earnings queries **correctly abstain** ("INSUFFICIENT EVIDENCE") rather than hallucinate. Conditional per-path retrieval branching lands when the SEC data is ingested. This is an honest, documented interim state — the routing decision is correct; the data just isn't there yet.
+
+### Trade-offs
+- **Gain:** genuine native hybrid; a real 6-node DAG (the #1 whiteboard interview artifact); cost-routing measured in numbers; graceful abstention on un-ingested paths.
+- **Lose:** the LangGraph wrapper adds orchestration structure over what worked as plain functions — justified by the interview signal and the clean seam it gives for adding conflict-detection / guardrail nodes in Weeks 3-4.
+
+### Revisit trigger
+When SEC fundamentals + 10-K risk factors are ingested: add conditional edges so `financial_metrics` / `risk_and_events` retrieve from their own corpora, and the router's abstentions turn into real answers.
 
 ---
 

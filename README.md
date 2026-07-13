@@ -187,13 +187,33 @@ python -m src.ingestion.ohlcv_loader         # OHLCV → prices
 python -m src.ingestion.sec_filing_parser    # 10-K/10-Q/8-K → documents
 ```
 
-**3. Chunk + embed → DuckDB `chunks` + Qdrant vectors:**
+**3. Chunk + embed → DuckDB `chunks` + Qdrant dense vectors:**
 ```bash
-# bge-m3 local embeddings. Transcripts alone ≈ 15K chunks, ~2 hrs on Apple MPS.
+# Embedding backend from EMBEDDING_BACKEND (.env): "voyage" (voyage-finance-2 API,
+# primary — needs a Voyage key) or "bge-m3" (local, free, ~2 hrs on Apple MPS).
+# Transcripts alone ≈ 15K chunks.
 python -m src.indexing.ingest_vectors --doc-type earnings_transcript
 # Smoke-test first with a subset:  --limit 10
 # Wipe and start over:             python -m scripts.reset_chunks
+# (If you switch backends after ingesting, re-embed in place: python -m scripts.reembed_chunks)
 ```
+
+**4. Add BM25 sparse vectors → enables hybrid retrieval:**
+```bash
+python -m scripts.add_sparse_vectors          # local
+```
+
+**5. (For live deploy) push everything to Qdrant Cloud:**
+```bash
+# Copies dense+sparse vectors AND embeds full chunk text into the payload, so the
+# deployed app is self-contained (no DuckDB, no local model). Needs QDRANT_CLOUD_*
+# in .env. Then run: python -m scripts.add_sparse_vectors --cloud
+python -m scripts.push_to_cloud
+python -m scripts.add_sparse_vectors --cloud
+```
+
+After steps 1–4 the full pipeline runs locally (hybrid retrieve → rerank →
+LangGraph → generate). Steps 5 is only needed to reproduce the live Render deploy.
 
 ### Run locally
 ```bash
@@ -211,7 +231,15 @@ docker-compose up
 
 Open http://localhost:8501 for Streamlit, http://localhost:8000/docs for API.
 
-### Run evals
+### Deploy (Render + Qdrant Cloud)
+The live demo runs from `render.yaml` (two services: `finsight-api`, `finsight-ui`).
+Secrets are set as Render dashboard env vars (never committed). Before deploying,
+verify the trimmed runtime has every dependency the serve path imports:
+```bash
+python -m scripts.check_serve_imports   # guards against requirements-serve.txt drift
+```
+
+### Run evals *(Week 3 — not yet implemented)*
 ```bash
 python -m src.evaluation.ragas_runner --golden evals/golden_queries.jsonl
 python -m src.evaluation.ablation --config evals/ablation_configs/retrieval.yaml
@@ -226,39 +254,39 @@ finsight/
 ├── data/                    # DVC tracked, gitignored if >50MB
 ├── notebooks/               # Exploration only (01_eda · 02_chunking_eval · 03_conflict_calibration)
 ├── src/
-│   ├── ingestion/           # Load raw → parquet/duckdb; temporal tagging
-│   ├── indexing/            # Chunking; Qdrant upsert
-│   ├── retrieval/           # Nodes 1-4: query understanding, router, retriever, context
-│   ├── generation/          # Node 5: Sonnet streaming + structured citations
-│   ├── insight/             # Evidence Conflict Detector — THE differentiator
-│   ├── guardrails/          # Input + output safety
-│   ├── recommendations/     # Shared-embedding related-tickers
-│   ├── evaluation/          # RAGAS + ablations + LLM comparison
-│   └── utils/               # Config, cost tracker, failure logger
-├── api/                     # FastAPI async app
-├── ui/                      # Streamlit 5-tab demo
-├── evals/                   # Golden queries, conflict pairs, results
+│   ├── ingestion/           # Load raw → DuckDB documents/prices (loaders + SEC parser)
+│   ├── indexing/            # chunker, embedder (voyage/bge-m3), sparse BM25, Qdrant upsert
+│   ├── retrieval/           # retriever (hybrid), reranker, LangGraph graph/nodes/state
+│   ├── generation/          # Sonnet streaming + inline-citation parsing
+│   ├── insight/             # Evidence Conflict Detector — THE differentiator (Week 3)
+│   ├── guardrails/          # Input + output safety (Week 4)
+│   ├── recommendations/     # Shared-embedding related-tickers (Week 4)
+│   ├── evaluation/          # RAGAS + ablations + LLM comparison (Week 3)
+│   └── utils/               # Config, logging
+├── api/                     # FastAPI: /health, /query, /query/stream
+├── ui/                      # Streamlit demo (single-query now; 5-tab in Week 4)
+├── scripts/                 # data download, ingest iteration, sparse vectors, cloud push
 ├── docs/
 │   ├── PRD.md               # Problem, users, metrics, trade-offs, ROI
-│   ├── architecture.md      # Diagrams, state schema, module boundaries
-│   ├── decisions.md         # Engineering war stories — interview artifact
+│   ├── architecture.md      # Diagrams, state schema, module boundaries (✅/🔷 marked)
+│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…013)
 │   ├── deployment-playbook.md   # How I'd deploy this at a regulated customer (FDE artifact)
 │   ├── interview-positioning.md # Role → question → artifact map
 │   └── finsight_spec_v2.3.md  # Canonical spec
-├── tests/
-├── .github/workflows/       # eval.yml + lint.yml
+├── artifacts/ticker_universe.json  # 76-ticker corpus scope (committed)
+├── render.yaml              # Render blueprint (finsight-api + finsight-ui)
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
-└── requirements-serve.txt   # minimal runtime for Render
+└── requirements-serve.txt   # minimal runtime for Render deploy
 ```
 
 ---
 
 ## Roadmap (5-week interview-scoped plan)
 
-- **Week 1** — End-to-end skeleton + live Render URL *(in progress)*
-- **Week 2** — Full retrieval pipeline (voyage, Cohere, LangGraph router, streaming, prompt caching)
+- **Week 1** — ✅ End-to-end skeleton + live Render URL (voyage-finance-2 embeddings, streaming cited answers, abstention)
+- **Week 2** — ✅ Full retrieval pipeline: hybrid BM25+dense (native RRF), Cohere Rerank 3.5 + local fallback, 5-node LangGraph pipeline (query-understanding → 3-path Haiku router → retrieve → rerank → generate), LangSmith tracing. 🔷 Remaining: temporal recency boost, SEC-corpus ingest for the metrics/risk paths.
 - **Week 3** — Conflict detector + RAGAS evals + 3 ablations + CI gate
 - **Week 4** — Production polish + related-tickers recs + load test + guardrails visible
 - **Week 5** — Demo polish, Loom video, blog post, `decisions.md` finalized
