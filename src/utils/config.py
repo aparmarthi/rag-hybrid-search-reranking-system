@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     voyage_model: str = Field("voyage-finance-2")
     cohere_rerank_model: str = Field("rerank-english-v3.5")
 
+    # ----- Embeddings backend -----
+    # "voyage" = voyage-finance-2 API (primary; no local model → deploy-friendly).
+    # "bge-m3" = local sentence-transformers fallback (~1.3GB, needs 2GB+ RAM).
+    # Both are 1024-dim → same Qdrant collection shape, but vectors from different
+    # models are NOT interchangeable: switching requires a full re-embed.
+    embedding_backend: str = Field("voyage")
+
+    # Hydrate full chunk text from DuckDB after retrieval. True for local dev;
+    # False on deploy (Qdrant Cloud payload carries full text → no DuckDB needed).
+    use_duckdb_hydration: bool = Field(False)
+
     # ----- App config -----
     env: str = Field("development")
     log_level: str = Field("INFO")

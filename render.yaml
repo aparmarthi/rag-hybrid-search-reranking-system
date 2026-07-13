@@ -1,0 +1,51 @@
+# Render deployment for FinSight — API + Streamlit UI, free tier.
+#
+# Two services:
+#   finsight-api  — FastAPI, reads vectors from Qdrant Cloud, calls Voyage + Claude
+#   finsight-ui   — Streamlit, talks to the API over HTTP
+#
+# Secrets (sync: false) are set in the Render dashboard, never committed.
+# The app is self-contained at serve time: Voyage API embeddings (no local model)
+# + full chunk text in the Qdrant Cloud payload (no DuckDB file needed).
+
+services:
+  - type: web
+    name: finsight-api
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements-serve.txt"
+    startCommand: "uvicorn api.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: EMBEDDING_BACKEND
+        value: voyage
+      - key: USE_DUCKDB_HYDRATION
+        value: "false"
+      - key: ENV
+        value: production
+      - key: QDRANT_URL
+        sync: false          # Qdrant Cloud cluster URL
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VOYAGE_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+
+  - type: web
+    name: finsight-ui
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements-serve.txt"
+    startCommand: "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: API_URL
+        sync: false          # set to the finsight-api service URL after first deploy

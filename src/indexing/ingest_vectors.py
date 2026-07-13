@@ -39,6 +39,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
 from src.indexing.chunker import Chunk, ChunkStrategy, chunk_text
+from src.indexing.embedder import get_embedder
 from src.indexing.qdrant_client import COLLECTION_NAME, ensure_collection, get_client
 from src.ingestion.schema import init_db
 from src.utils.config import settings
@@ -73,28 +74,12 @@ def _pick_strategy(doc_type: str, section: str | None) -> ChunkStrategy:
     return "sentence"
 
 
-def _get_embedder():
-    """
-    Lazy-load bge-m3 from sentence-transformers.
-    First run downloads ~1.3GB model to ~/.cache/huggingface; cached afterward.
-
-    Device selection priority: Apple Metal (mps) > CUDA > CPU. On Apple Silicon
-    this gives a ~4x speedup vs CPU. Falls back gracefully if mps not available.
-    """
-    import torch
-    from sentence_transformers import SentenceTransformer
-
-    if torch.backends.mps.is_available():
-        device = "mps"
-    elif torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
-
-    log.info("Loading BAAI/bge-m3 on device=%s...", device)
-    model = SentenceTransformer("BAAI/bge-m3", device=device)
-    log.info("Embedder ready")
-    return model
+def _embed_batched(embedder, texts: list[str], max_batch: int = 128) -> list[list[float]]:
+    """Embed texts, chunked to the backend's per-request cap (Voyage limit = 128)."""
+    out: list[list[float]] = []
+    for i in range(0, len(texts), max_batch):
+        out.extend(embedder.embed_documents(texts[i : i + max_batch]))
+    return out
 
 
 def _fetch_documents(
@@ -177,7 +162,8 @@ def run(
     # Setup
     qdrant = get_client()
     ensure_collection(qdrant, recreate=recreate_collection)
-    embedder = _get_embedder()
+    embedder = get_embedder()
+    log.info("Embedder backend: %s", embedder.id())
 
     conn = init_db()
     run_id = _begin_run(conn, "ingest_vectors")
@@ -193,7 +179,6 @@ def run(
             _end_run(conn, run_id, "success", 0)
             return 0
 
-        batch_size = 64  # embedder batch — MPS/GPU can handle this; CPU will auto-scale
         total_batches = 0
 
         for doc_idx, doc in enumerate(docs, 1):
@@ -210,14 +195,9 @@ def run(
             if not chunks:
                 continue
 
-            # Embed in batches
+            # Embed in batches (backend-agnostic; Voyage caps at 128/request)
             texts = [c.text for c in chunks]
-            vectors = embedder.encode(
-                texts,
-                batch_size=batch_size,
-                show_progress_bar=False,
-                normalize_embeddings=True,  # cosine-ready
-            ).tolist()
+            vectors = _embed_batched(embedder, texts)
 
             # Prep DuckDB rows + Qdrant points
             duckdb_rows = []

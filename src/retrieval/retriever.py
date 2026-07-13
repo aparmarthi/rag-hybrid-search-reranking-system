@@ -16,10 +16,10 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
 
 import duckdb
 
+from src.indexing.embedder import get_embedder
 from src.indexing.qdrant_client import COLLECTION_NAME, get_client
 from src.utils.config import settings
 from src.utils.logging import get_logger
@@ -42,43 +42,36 @@ class RetrievedChunk:
     fiscal_quarter: int | None
 
 
-@lru_cache(maxsize=1)
-def _get_embedder():
-    """Lazy-load bge-m3 once per process. MPS on Apple Silicon, else CPU."""
-    import torch
-    from sentence_transformers import SentenceTransformer
-
-    device = "mps" if torch.backends.mps.is_available() else (
-        "cuda" if torch.cuda.is_available() else "cpu"
-    )
-    log.info("Loading BAAI/bge-m3 query embedder on device=%s", device)
-    return SentenceTransformer("BAAI/bge-m3", device=device)
-
-
 class Retriever:
     """Dense retrieval: embed query → Qdrant search → DuckDB text hydration."""
 
     def __init__(self) -> None:
         self._qdrant = get_client()
+        self._embedder = get_embedder()
 
     def _embed_query(self, query: str) -> list[float]:
-        model = _get_embedder()
-        return model.encode([query], normalize_embeddings=True).tolist()[0]
+        return self._embedder.embed_query(query)
 
     def _hydrate_texts(self, chunk_ids: list[str]) -> dict[str, str]:
-        """Fetch full chunk text from DuckDB for the given chunk_ids."""
-        if not chunk_ids:
+        """Fetch full chunk text from DuckDB (local dev only; disabled on deploy
+        where the Qdrant payload already carries full text). Returns {} on any
+        failure so retrieval degrades to the payload text rather than crashing."""
+        if not chunk_ids or not settings.use_duckdb_hydration:
             return {}
-        conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
         try:
-            placeholders = ",".join("?" for _ in chunk_ids)
-            rows = conn.execute(
-                f"SELECT chunk_id, text FROM chunks WHERE chunk_id IN ({placeholders})",
-                chunk_ids,
-            ).fetchall()
-            return {cid: text for cid, text in rows}
-        finally:
-            conn.close()
+            conn = duckdb.connect(str(settings.duckdb_path), read_only=True)
+            try:
+                placeholders = ",".join("?" for _ in chunk_ids)
+                rows = conn.execute(
+                    f"SELECT chunk_id, text FROM chunks WHERE chunk_id IN ({placeholders})",
+                    chunk_ids,
+                ).fetchall()
+                return {cid: text for cid, text in rows}
+            finally:
+                conn.close()
+        except Exception as e:  # noqa: BLE001 — deploy has no DuckDB; fall back to payload
+            log.warning("DuckDB hydration unavailable, using payload text: %s", e)
+            return {}
 
     def search(self, query: str, top_k: int | None = None) -> list[RetrievedChunk]:
         """Dense search for the top-k chunks most relevant to `query`."""

@@ -251,6 +251,33 @@ If Anthropic access is ever unavailable for a live demo, the documented fallback
 
 ---
 
+## DEC-012: voyage-finance-2 retrieval "looked worse" — it wasn't; cross-model scores aren't comparable
+**Date:** 2026-06-23 (Week 2 — embedding backend swap)
+
+### Context
+Switched the embedding backend from bge-m3 (Week 1) to voyage-finance-2 to (a) fit Render's 512MB free tier — an API embedder needs no local model — and (b) get the domain-tuned finance model (DEC-003). After re-embedding all 15,023 chunks, top-k results looked *worse*: cosine scores dropped from ~0.60 (bge-m3) to ~0.40 (voyage), and top hits read as mid-sentence fragments.
+
+### Investigation
+Three direct checks:
+1. **Model discrimination** — query vs a hand-written relevant doc = 0.51 cosine; vs irrelevant = 0.11. voyage cleanly separates on-topic from off-topic. ✓
+2. **Storage integrity** — pulled a stored Qdrant vector, re-embedded its full DuckDB text, cosine = 1.0. Vectors correspond to the right chunks. ✓
+3. **The "fragments"** — earnings-call transcript chunks *are* mid-sentence passages (continuous speech, ~2,900 chars). bge-m3 returned the same style; it just assigned higher absolute scores.
+
+### Conclusion
+No bug. **Cosine scores are not comparable across embedding models** — voyage-finance-2's distribution simply runs lower than bge-m3's. Judging one model's retrieval by another's score scale is apples-to-oranges. The alarming "0.60 → 0.40 regression" was a category error on my part.
+
+### What this does NOT settle
+Whether voyage is measurably *better* than bge-m3 on THIS corpus. Eyeballing can't answer that — it requires the golden-set ablation (Recall@K, MRR, NDCG), which is the Week 3 deliverable and the exact "hybrid+rerank beats dense by X% NDCG" interview artifact. Deploy proceeds on voyage; the quality delta gets proven rigorously in Week 3, not asserted.
+
+### Trade-offs
+- **Gain:** free-tier-deployable (no local model), domain model in place, and a documented reminder never to compare raw scores across models.
+- **Lose:** nothing measured yet — the bge-m3-vs-voyage quality claim is deferred to eval, honestly.
+
+### Revisit trigger
+Week 3 ablation. If voyage does NOT beat bge-m3 on NDCG for our corpus, reconsider — but note bge-m3 can't deploy to free tier regardless, so a loss would mean "pay for a bigger host to keep bge-m3" vs "keep voyage." That's a cost decision, decided with numbers then.
+
+---
+
 ## DEC-011: Inline [N] citations over forced tool-use — to preserve streaming
 **Date:** 2026-06-23 (Week 1 Day 5 — generation latency)
 
