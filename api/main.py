@@ -59,9 +59,12 @@ class QueryResponse(BaseModel):
     question: str
     answer: str
     grounded: bool
+    routing_path: str | None = None
+    rewritten_query: str | None = None
     citations: list[CitationOut]
     chunks: list[ChunkOut]
     latency_ms: int
+    latency_per_node_ms: dict[str, int] | None = None
     tokens: dict[str, int]
 
 
@@ -128,22 +131,29 @@ def health() -> HealthResponse:
 
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest) -> QueryResponse:
-    """Retrieve evidence and generate a grounded, cited answer."""
-    start = time.perf_counter()
+    """Run the full LangGraph pipeline: query-understanding → router → retrieve
+    → rerank → generate. Returns a grounded, cited answer + routing metadata."""
+    from src.retrieval.graph import run_pipeline
 
-    chunks = _retrieve_and_rerank(req.question, req.top_k)
-    answer = _generator().generate(req.question, chunks)
+    start = time.perf_counter()
+    state = run_pipeline(req.question, top_k=req.top_k)
+    chunks = state.get("reranked", [])
 
     latency_ms = int((time.perf_counter() - start) * 1000)
-    log.info("query answered in %dms (grounded=%s, chunks=%d)", latency_ms, answer.grounded, len(chunks))
+    log.info(
+        "query answered in %dms (path=%s, grounded=%s, chunks=%d)",
+        latency_ms, state.get("routing_path"), state.get("grounded"), len(chunks),
+    )
 
     return QueryResponse(
         question=req.question,
-        answer=answer.answer_text,
-        grounded=answer.grounded,
+        answer=state.get("answer", ""),
+        grounded=state.get("grounded", False),
+        routing_path=state.get("routing_path"),
+        rewritten_query=state.get("rewritten_query"),
         citations=[
             CitationOut(chunk_number=c.chunk_number, source_label=c.source_label)
-            for c in answer.citations
+            for c in state.get("citations", [])
         ],
         chunks=[
             ChunkOut(
@@ -157,11 +167,8 @@ def query(req: QueryRequest) -> QueryResponse:
             for c in chunks
         ],
         latency_ms=latency_ms,
-        tokens={
-            "input": answer.input_tokens,
-            "output": answer.output_tokens,
-            "cache_read": answer.cache_read_tokens,
-        },
+        latency_per_node_ms=state.get("latency_ms"),
+        tokens=state.get("tokens", {"input": 0, "output": 0, "cache_read": 0}),
     )
 
 
