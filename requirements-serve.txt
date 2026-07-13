@@ -3,12 +3,17 @@
 # the image small and cold starts fast on Render's free tier.
 #
 # NOT included (added when their feature lands): torch/sentence-transformers
-# (bge-m3 fallback — deploy uses the Voyage API instead), langchain/langgraph
-# (Week 2 pipeline), presidio (Week 4 guardrails). Keep this file lean.
+# (bge-m3 fallback — deploy uses the Voyage API instead), presidio (Week 4
+# guardrails). Keep this file lean.
 
 python-dotenv==1.0.1
 pydantic==2.10.3
 pydantic-settings==2.7.0
+
+# Orchestration (Week 2 LangGraph pipeline)
+langgraph==0.2.60
+langchain-core==0.3.28
+langsmith==0.2.7
 
 # LLM + embeddings (API clients — no local models)
 anthropic==0.42.0
