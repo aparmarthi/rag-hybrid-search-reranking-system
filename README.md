@@ -4,9 +4,10 @@
 
 **Built to know what it doesn't know:** it refuses when it can't ground an answer, flags stale evidence, and surfaces contradictions between sources instead of confidently averaging them.
 
-**Live demo:** *(deploying Week 1 — URL here by end of Week 1)* — treated as a P0: the link must work flawlessly on first click, every time (no cold-start fumble in the first 30 seconds).
+**Live demo:** https://finsight-ui-z0mp.onrender.com — ask a question about 2019–2023 earnings calls and get a streamed, cited answer. *(Free-tier hosting: first request after ~15 min idle cold-starts in ~50s, then it's fast.)*
+**API:** https://finsight-api-otsr.onrender.com/docs (FastAPI · `/query`, `/query/stream`, `/health`)
 **Demo video:** *(Loom walkthrough in Week 5)*
-**Status:** 🟦 Week 1 of 5 — scaffolding complete
+**Status:** 🟩 Live — retrieval pipeline deployed (Week 1 gate cleared); LangGraph pipeline + conflict detector next (Week 2–3)
 
 ---
 
