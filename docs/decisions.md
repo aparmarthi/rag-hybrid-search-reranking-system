@@ -278,6 +278,49 @@ If Anthropic access is ever unavailable for a live demo, the documented fallback
 
 ---
 
+## DEC-014: Query-relative temporal recency boost (not wall-clock "newest")
+**Date:** 2026-07-12 (Week 2)
+
+### Context
+v2.3 specs a recency boost: "+0.15 for the last 2 quarters." That assumes a
+*live* corpus where "recent" = "newest." FinSight's corpus is **historical**
+(2019–2023) and the demo centers on the March 2020 window (DEC-005). A naive
+"boost newest" would always favor 2023 chunks — actively *hurting* a query like
+"What did Apple say about iPhone demand in Q1 2020?"
+
+### Decision
+Recency is **relative to the period the query is about**, not the wall clock.
+- Node 1 (query understanding, Haiku) extracts a `temporal_reference` (year +
+  optional quarter) from the query.
+- The rerank node boosts chunks by proximity to that reference: full
+  `recency_boost_weight` within `recency_boost_quarters`, linear decay to zero by
+  2× that span. No temporal reference in the query → no boost (pure relevance).
+- A `staleness_flag` fires when even the closest retained chunk is far (> 2× span
+  quarters) from the reference — surfaced in the API response and driving honest
+  abstention.
+
+### Rationale
+1. **Correct for a historical corpus.** "Q1 2020" now surfaces 2020 chunks;
+   "2022" surfaces 2021–2022 chunks — verified. Same corpus, query-adaptive order.
+2. **Staleness = honesty.** A query about 2015 (pre-corpus) flags stale and the
+   generator abstains rather than answering from off-period chunks. Verified.
+3. **Better interview story than the spec's literal version:** "I adapted recency
+   to the shape of the data — on a historical corpus, boosting the newest chunk is
+   wrong; I boost toward the period the query references, and flag staleness when
+   the corpus can't cover it."
+
+### Trade-offs
+- **Gain:** period-accurate retrieval + honest staleness signal on a fixed corpus.
+- **Lose:** depends on Haiku correctly extracting the period (degrades to no-boost
+  pure relevance on failure — safe). A live corpus would also want a wall-clock
+  component; easy to add when data becomes live.
+
+### Revisit trigger
+If the corpus becomes live/streaming, add a wall-clock recency term alongside the
+query-relative one.
+
+---
+
 ## DEC-013: Native server-side hybrid (BM25+dense RRF) + a linear LangGraph pipeline
 **Date:** 2026-07-12 (Week 2)
 

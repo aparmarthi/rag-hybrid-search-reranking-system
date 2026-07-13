@@ -61,6 +61,8 @@ class QueryResponse(BaseModel):
     grounded: bool
     routing_path: str | None = None
     rewritten_query: str | None = None
+    staleness_flag: bool = False
+    temporal_reference: dict | None = None
     citations: list[CitationOut]
     chunks: list[ChunkOut]
     latency_ms: int
@@ -151,6 +153,8 @@ def query(req: QueryRequest) -> QueryResponse:
         grounded=state.get("grounded", False),
         routing_path=state.get("routing_path"),
         rewritten_query=state.get("rewritten_query"),
+        staleness_flag=state.get("staleness_flag", False),
+        temporal_reference=state.get("temporal_reference"),
         citations=[
             CitationOut(chunk_number=c.chunk_number, source_label=c.source_label)
             for c in state.get("citations", [])
