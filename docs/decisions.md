@@ -337,6 +337,54 @@ If Anthropic access is ever unavailable for a live demo, the documented fallback
 
 ---
 
+## DEC-015: Eval methodology — pooled-LLM relevance, and reading the numbers honestly
+**Date:** 2026-07-13 (Week 3)
+
+### Context
+The "rigor" artifacts: a 50-query golden set + 3 ablations + RAGAS. Building them
+surfaced several measurement realities that matter more than the headline numbers.
+
+### Decisions & findings
+1. **Relevance labels via LLM pooling.** No human gold labels, so for each query
+   we pool the top-K chunks from all configs, LLM-judge each relevant/not, and
+   score every config against those labels. Standard IR pooling (avoids biasing
+   toward one retriever). Framed as LLM-labeled, not human-gold — honest about it.
+2. **Retrieval ablation (the headline): hybrid+rerank beats dense by +27.4%
+   NDCG@10** (n=40) — clears the ≥10% gate. The nuance is the real story: **hybrid
+   alone captures most of the lift**; reranking sharpens *ordering* (MRR/NDCG) but
+   slightly lowers *Recall* — it reorders the top set, doesn't retrieve more.
+   Reading that trade-off correctly is a better interview signal than a clean
+   monotonic table.
+3. **RAGAS faithfulness 0.806 — passes the 0.80 North Star gate** (Claude judge +
+   Voyage embeddings, not the OpenAI default). Two debugging notes: (a) citation
+   `[N]` markers + markdown had to be stripped before scoring (RAGAS's claim
+   extractor choked on them — measurement artifact worth ~+0.06); (b) the judge
+   needed max_tokens=4096 or it threw LLMDidNotFinish and corrupted scores
+   (~+0.15 once fixed). **answer_relevancy stayed low (~0.20)** — and that's a
+   *real* tension, not a bug: our answers deliberately hedge when evidence is thin
+   ("the chunks confirm X but not Y"), which RAGAS penalizes as "incomplete." Our
+   groundedness-first design intentionally trades relevancy-completeness for
+   honesty. Documented as the intended trade-off.
+4. **Chunking ablation: near-flat on a 60-doc subset** (paragraph marginally best
+   on Recall, 0.25 vs 0.20; differences within noise). Reported as-is with the
+   caveat that the golden queries target the full corpus, so a subset under-
+   retrieves regardless of strategy — a conclusive result needs a full-corpus
+   re-index (deferred). NOT cherry-picked into a clean "paragraph wins" table.
+
+### Rationale
+Every one of these is a place I could have quietly shown a better number (pad the
+prompt for cache hits, drop answer_relevancy, hand-pick chunking labels). The
+decision was consistently to **report the honest number + the reason** — because
+in an interview, "faithfulness passes at 0.806, and here's exactly why
+answer_relevancy is low and why that's the design working" is stronger than a
+suspiciously-clean scoreboard.
+
+### Revisit trigger
+Full-corpus chunking ablation; Claude-vs-GPT-4o LLM comparison (DEC-010 OpenRouter
+path); human-labeled relevance subset to validate the LLM-pooled labels.
+
+---
+
 ## DEC-014: Query-relative temporal recency boost (not wall-clock "newest")
 **Date:** 2026-07-12 (Week 2)
 

@@ -1,0 +1,24 @@
+{
+  "dense": {
+    "recall@5": 0.5782,
+    "mrr": 0.6518,
+    "ndcg@10": 0.5835,
+    "latency_ms_p50": 148.1,
+    "n": 40
+  },
+  "hybrid": {
+    "recall@5": 0.6547,
+    "mrr": 0.7974,
+    "ndcg@10": 0.718,
+    "latency_ms_p50": 144.6,
+    "n": 40
+  },
+  "hybrid_rerank": {
+    "recall@5": 0.6503,
+    "mrr": 0.804,
+    "ndcg@10": 0.7434,
+    "latency_ms_p50": 282.9,
+    "n": 40
+  },
+  "ndcg_lift_hybrid_rerank_vs_dense_pct": 27.4
+}
