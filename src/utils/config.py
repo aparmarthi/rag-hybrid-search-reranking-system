@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     anthropic_primary_model: str = Field("claude-sonnet-4-6")
     anthropic_router_model: str = Field("claude-haiku-4-5-20251001")
     voyage_model: str = Field("voyage-finance-2")
-    cohere_rerank_model: str = Field("rerank-english-v3.5")
+    cohere_rerank_model: str = Field("rerank-v3.5")  # latest; no v4 exists yet (API-verified)
 
     # ----- Embeddings backend -----
     # "voyage" = voyage-finance-2 API (primary; no local model → deploy-friendly).
@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     # Retrieval mode: "dense" (Week-1 baseline) or "hybrid" (BM25+dense RRF).
     # Requires BM25 sparse vectors populated (scripts/add_sparse_vectors.py).
     retrieval_mode: str = Field("hybrid")
+
+    # Reranker: "cohere" (Rerank 3.5 API, primary), "local" (ms-marco cross-encoder
+    # fallback), or "none" (pass-through, for the ablation baseline).
+    reranker_backend: str = Field("cohere")
+    # Candidates to retrieve before reranking down to max_chunks_returned.
+    rerank_candidate_k: int = Field(20)
 
     # ----- App config -----
     env: str = Field("development")

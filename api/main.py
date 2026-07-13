@@ -82,6 +82,21 @@ def _generator() -> Generator:
     return Generator()
 
 
+@lru_cache(maxsize=1)
+def _reranker() -> "Reranker":
+    from src.retrieval.reranker import Reranker
+
+    return Reranker()
+
+
+def _retrieve_and_rerank(question: str, top_k: int):
+    """Hybrid retrieve a candidate pool, then rerank down to top_k."""
+    from src.utils.config import settings
+
+    candidates = _retriever().search(question, top_k=max(settings.rerank_candidate_k, top_k))
+    return _reranker().rerank(question, candidates, top_k=top_k)
+
+
 # ----- Endpoints -----
 @app.on_event("startup")
 def _warmup() -> None:
@@ -116,7 +131,7 @@ def query(req: QueryRequest) -> QueryResponse:
     """Retrieve evidence and generate a grounded, cited answer."""
     start = time.perf_counter()
 
-    chunks = _retriever().search(req.question, top_k=req.top_k)
+    chunks = _retrieve_and_rerank(req.question, req.top_k)
     answer = _generator().generate(req.question, chunks)
 
     latency_ms = int((time.perf_counter() - start) * 1000)
@@ -159,7 +174,7 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
     """
     def events():
         start = time.perf_counter()
-        chunks = _retriever().search(req.question, top_k=req.top_k)
+        chunks = _retrieve_and_rerank(req.question, req.top_k)
         for ev in _generator().generate_stream(req.question, chunks):
             if ev["type"] == "token":
                 yield f"event: token\ndata: {json.dumps({'text': ev['text']})}\n\n"
