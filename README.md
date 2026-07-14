@@ -298,10 +298,10 @@ finsight/
 ## Roadmap (5-week interview-scoped plan)
 
 - **Week 1** — ✅ End-to-end skeleton + live Render URL (voyage-finance-2 embeddings, streaming cited answers, abstention)
-- **Week 2** — ✅ Full retrieval pipeline: hybrid BM25+dense (native RRF), Cohere Rerank 3.5 + local fallback, 5-node LangGraph pipeline (query-understanding → 3-path Haiku router → retrieve → rerank → generate), LangSmith tracing. 🔷 Remaining: temporal recency boost, SEC-corpus ingest for the metrics/risk paths.
-- **Week 3** — Conflict detector + RAGAS evals + 3 ablations + CI gate
-- **Week 4** — Production polish + related-tickers recs + load test + guardrails visible
-- **Week 5** — Demo polish, Loom video, blog post, `decisions.md` finalized
+- **Week 2** — ✅ Full retrieval pipeline: hybrid BM25+dense (native RRF), Cohere Rerank 3.5 + local fallback, 6-node LangGraph pipeline (query-understanding → 3-path Haiku router → retrieve → rerank → conflict-detect → generate), query-relative temporal recency boost + staleness, LangSmith tracing.
+- **Week 3** — ✅ Evidence conflict detector (precision-gated), 50-query golden set, retrieval ablation (**hybrid+rerank +27.4% NDCG** vs dense), RAGAS faithfulness (**0.806**, passes 0.80 gate), chunking ablation, 12 unit tests, lightweight CI (lint + import-guard + tests). 🔷 Skipped by choice: Claude-vs-GPT LLM bake-off (stale target), MLflow (one-shot ablations → git-versioned JSON instead).
+- **Week 4** — ✅ Related-tickers recs (shared-embedding NN), per-query cost tracker, 5-mode failure logger, `/recommend` + `/feedback` endpoints, 5-tab Streamlit demo. 🔷 Remaining: live load-test run (P95, token-budget-gated), multi-turn context (deferred — low ROI on tab UI).
+- **Week 5** — Demo Loom video, blog post, LinkedIn Featured *(your distribution work)*.
 
 Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this project maps to specific roles — and how I'd deploy it at a real customer — is in [docs/interview-positioning.md](docs/interview-positioning.md) and [docs/deployment-playbook.md](docs/deployment-playbook.md).
 

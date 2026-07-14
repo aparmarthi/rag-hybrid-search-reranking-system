@@ -337,6 +337,45 @@ If Anthropic access is ever unavailable for a live demo, the documented fallback
 
 ---
 
+## DEC-016: Week-4 production layer + what was deliberately scoped out
+**Date:** 2026-07-14 (Week 4)
+
+### Built
+- **Related-ticker recommendations on shared infra** (`related_tickers.py`): per-
+  ticker centroids over the SAME voyage-finance-2 vectors that power retrieval →
+  cosine-NN. No new model, no separate index — the recs ride the retrieval
+  embedding space. This is v2.3 interview moment #5 ("retrieval and recommendation
+  are the same problem"), made literal. Verified sensible (AAPL→GOOGL/ADSK/NOW;
+  LLY→MRNA at 0.62).
+- **Cost tracker** (`cost_tracker.py`): per-query $ from token usage; Haiku priced
+  10× under Sonnet — the concrete cost-routing metric. Logs to cost_log.jsonl.
+- **Failure-mode logger** (`failure_tracker.py`): 5-mode classifier. Notably,
+  honest abstention ("INSUFFICIENT EVIDENCE") is explicitly NOT classified as
+  hallucination — the trust design and the eval agree.
+- **`/recommend` + `/feedback` endpoints**, cost+failure surfaced in `/query`,
+  startup warmup migrated to the modern lifespan handler.
+- **5-tab Streamlit** (Ask / Conflict / Related tickers / Observability / Business
+  value) — the multi-scenario demo surface.
+
+### Deliberately scoped OUT (with reasons — the discipline signal)
+- **Multi-turn (last-3) context:** low ROI on a tab-based single-query UI; would
+  rework streaming + session state for modest gain. Deferred, documented.
+- **Claude-vs-GPT LLM bake-off (DEC-010 harness exists):** the spec's "GPT-4o"
+  target is ~2 generations stale; a rigorous current comparison needs a bigger
+  labeled set than 40 queries to be meaningful, and costs tokens. Scoped out as a
+  judgment call, harness left in place.
+- **MLflow experiment tracking:** the ablations are one-shot, not iterative —
+  MLflow would be theater for 3 static runs. Used git-versioned JSON results
+  instead. Would earn its place once experiments become iterative.
+
+### Verifiable-now vs credit-gated
+All Week-4 code is unit-tested with NO API calls (23 tests, CI-green). What needs
+a funded pipeline to validate — live end-to-end, the locust P95 number, the demo —
+is explicitly deferred, not faked. The locustfile is committed as the load-test
+*definition* with a cost warning; running it is a budgeted action.
+
+---
+
 ## DEC-015: Eval methodology — pooled-LLM relevance, and reading the numbers honestly
 **Date:** 2026-07-13 (Week 3)
 
