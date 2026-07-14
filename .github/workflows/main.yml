@@ -3,10 +3,14 @@
 #   2. serve-import guard (catches requirements-serve.txt drift — the 500-on-deploy class)
 #   3. unit tests (pure logic: chunker, conflict gates, temporal, citations)
 #
-# The expensive RAGAS faithfulness gate (≥0.75) is NOT run here — it needs API
+# The expensive RAGAS faithfulness gate (>=0.75) is NOT run here — it needs API
 # keys + spends tokens per run. It's run deliberately before deploy:
 #   python -m src.evaluation.ragas_runner    (see README "Run evals")
 # This split keeps CI cheap and per-push while gating expensive evals manually.
+#
+# Dummy API-key env vars below: src/utils/config.py validates required keys at
+# import time (pydantic Field(...)). CI makes NO API calls, so placeholder values
+# just let config import succeed — real keys live in Render secrets, not here.
 name: ci
 
 on:
@@ -15,12 +19,19 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  ANTHROPIC_API_KEY: "ci-dummy"
+  VOYAGE_API_KEY: "ci-dummy"
+  COHERE_API_KEY: "ci-dummy"
+  LANGSMITH_API_KEY: "ci-dummy"
+  LANGSMITH_TRACING: "false"
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install (serve deps + dev tools)
