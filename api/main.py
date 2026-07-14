@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from fastapi import FastAPI
@@ -28,10 +29,23 @@ from src.utils.logging import get_logger
 
 log = get_logger(__name__)
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Warm the embedder + Qdrant connection at startup so the first real query
+    doesn't pay the cold-start penalty (critical on Render free-tier cold starts)."""
+    try:
+        _retriever().search("warmup", top_k=1)
+        log.info("Warmup complete — embedder loaded, Qdrant reachable")
+    except Exception as e:  # noqa: BLE001
+        log.warning("Warmup failed (will lazy-load on first query): %s", e)
+    yield
+
+
 app = FastAPI(
     title="FinSight API",
     description="Multi-source financial evidence engine — grounded, cited RAG.",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 
 
@@ -69,6 +83,8 @@ class QueryResponse(BaseModel):
     latency_ms: int
     latency_per_node_ms: dict[str, int] | None = None
     tokens: dict[str, int]
+    cost_usd: float | None = None
+    failure_mode: str | None = None
 
 
 class HealthResponse(BaseModel):
@@ -103,17 +119,6 @@ def _retrieve_and_rerank(question: str, top_k: int):
 
 
 # ----- Endpoints -----
-@app.on_event("startup")
-def _warmup() -> None:
-    """Pre-load bge-m3 and warm the Qdrant connection so the first real query
-    doesn't pay the cold-start penalty (critical on Render free-tier cold starts)."""
-    try:
-        _retriever().search("warmup", top_k=1)
-        log.info("Warmup complete — embedder loaded, Qdrant reachable")
-    except Exception as e:  # noqa: BLE001
-        log.warning("Warmup failed (will lazy-load on first query): %s", e)
-
-
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     """Liveness + dependency check."""
@@ -174,6 +179,8 @@ def query(req: QueryRequest) -> QueryResponse:
         latency_ms=latency_ms,
         latency_per_node_ms=state.get("latency_ms"),
         tokens=state.get("tokens", {"input": 0, "output": 0, "cache_read": 0}),
+        cost_usd=state.get("cost_usd"),
+        failure_mode=state.get("failure_mode"),
     )
 
 
@@ -237,3 +244,55 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
                 yield f"event: done\ndata: {json.dumps(payload)}\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream")
+
+
+# ----- Related tickers (recommendation layer — shared embedding infra, no LLM) -----
+@lru_cache(maxsize=1)
+def _related():
+    from src.recommendations.related_tickers import RelatedTickers
+
+    return RelatedTickers()
+
+
+class RecommendResponse(BaseModel):
+    ticker: str
+    related: list[dict]  # [{"ticker": "MSFT", "score": 0.87}, ...]
+
+
+@app.get("/recommend/{ticker}", response_model=RecommendResponse)
+def recommend(ticker: str, k: int = 5) -> RecommendResponse:
+    """Related tickers by earnings-call language similarity (centroid NN over the
+    same voyage vectors that power retrieval — retrieval & recs on shared infra)."""
+    pairs = _related().related(ticker, k=k)
+    return RecommendResponse(
+        ticker=ticker.upper(),
+        related=[{"ticker": t, "score": s} for t, s in pairs],
+    )
+
+
+# ----- Feedback (thumbs up/down — product signal) -----
+class FeedbackRequest(BaseModel):
+    question: str
+    answer: str = ""
+    rating: int = Field(..., ge=-1, le=1, description="1 up, -1 down, 0 neutral")
+    note: str = ""
+
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest) -> dict:
+    """Log a thumbs up/down on an answer to logs/feedback.jsonl."""
+    import json as _json
+    from datetime import datetime, timezone
+
+    path = settings.repo_root / "logs" / "feedback.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rec = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "question": req.question[:300],
+        "answer": req.answer[:300],
+        "rating": req.rating,
+        "note": req.note[:300],
+    }
+    with open(path, "a") as f:
+        f.write(_json.dumps(rec) + "\n")
+    return {"status": "recorded", "rating": req.rating}

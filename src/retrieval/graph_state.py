@@ -46,3 +46,5 @@ class FinSightState(TypedDict, total=False):
     # ----- Observability -----
     latency_ms: dict[str, int]
     tokens: dict[str, int]
+    cost_usd: float
+    failure_mode: str

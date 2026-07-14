@@ -295,16 +295,28 @@ def detect_conflicts(state: FinSightState) -> dict:
 
 # ---- Node 5: Generate ----
 def generate(state: FinSightState) -> dict:
-    """Sonnet generation with inline [N] citations over the reranked evidence."""
+    """Sonnet generation with inline [N] citations over the reranked evidence.
+    Also computes per-query cost and logs the query's failure-mode classification."""
+    from src.utils.cost_tracker import query_cost
+    from src.utils.failure_tracker import log_query
+
     t = time.perf_counter()
     q = state.get("rewritten_query") or state["raw_query"]
     ans = _generator().generate(q, state.get("reranked", []))
     lat = {**state.get("latency_ms", {}), "generate": int((time.perf_counter() - t) * 1000)}
     tokens = {"input": ans.input_tokens, "output": ans.output_tokens, "cache_read": ans.cache_read_tokens}
-    return {
+    out = {
         "answer": ans.answer_text,
         "citations": ans.citations,
         "grounded": ans.grounded,
         "latency_ms": lat,
         "tokens": tokens,
+        "cost_usd": query_cost(tokens, settings.anthropic_primary_model),
     }
+    # Log failure-mode classification (observability). Never break the answer on log failure.
+    try:
+        merged = {**state, **out}
+        out["failure_mode"] = log_query(merged, latency_ms=sum(lat.values()))
+    except Exception as e:  # noqa: BLE001
+        log.warning("query log failed: %s", type(e).__name__)
+    return out
