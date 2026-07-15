@@ -1,11 +1,10 @@
 # FinSight — Architecture
 
 **Canonical spec:** `docs/finsight_spec_v2.3.md`
-**Last updated:** 2026-07-12 (Week 2 — retrieval pipeline live on Render)
+**Last updated:** 2026-07-14 (Weeks 1–4 complete — full pipeline + conflict detector + evals live)
 
-**Legend:** ✅ implemented & live · 🔶 partial · 🔷 planned (Week 3–4). This doc
-describes what's actually built; planned nodes are marked so it stays honest to
-a reviewer.
+**Legend:** ✅ implemented & live · 🔶 partial · 🔷 planned. This doc describes
+what's actually built; planned nodes are marked so it stays honest to a reviewer.
 
 ---
 
@@ -13,32 +12,29 @@ a reviewer.
 
 ```mermaid
 flowchart TB
-    U[User Query] --> N1[Node 1 ✅<br/>Query Understanding — Haiku]
+    U[User Query] --> N1[Node 1 ✅<br/>Query Understanding — Haiku<br/>rewrite + ticker + temporal ref]
     N1 --> N2[Node 2 ✅<br/>Router — Haiku, 3-path]
     N2 --> N3[Node 3 ✅<br/>Retrieve<br/>Qdrant hybrid BM25+dense RRF]
-    N3 --> N4[Node 4 ✅<br/>Rerank<br/>Cohere 3.5 + local fallback]
-    N4 --> N5[Node 5 ✅<br/>Generate — Sonnet 4.6<br/>inline citations, streaming]
-    N5 --> R[Response<br/>Streaming + Citations]
+    N3 --> N4[Node 4 ✅<br/>Rerank + temporal boost<br/>Cohere 3.5 + local fallback]
+    N4 --> N5[Node 5 ✅<br/>Detect Conflicts<br/>the differentiator]
+    N5 --> N6[Node 6 ✅<br/>Generate — Sonnet 4.6<br/>inline citations, streaming]
+    N6 --> R[Response<br/>Streaming + Citations + Conflicts]
 
     IG[Input Guardrails 🔷<br/>PII + jailbreak] -.planned.-> N1
     CB[Context Builder 🔷<br/>DuckDB fundamentals + OHLCV] -.planned.-> N4
-    CD[Conflict Detector 🔷<br/>the differentiator] -.planned.-> N5
     OG[Output Guardrails 🔷<br/>faithfulness + failure log] -.planned.-> R
 
     QD[(Qdrant Cloud ✅<br/>15,023 pts · dense + BM25 sparse<br/>+ full text in payload)] --- N3
     LS[LangSmith ✅<br/>per-node tracing] -.->  N1
-    LS -.-> N2
-    LS -.-> N3
-    LS -.-> N4
-    LS -.-> N5
+    LS -.-> N6
 
     style N5 fill:#ffe4b5
     style N3 fill:#e0f2fe
 ```
 
-The current live pipeline is the 5-node chain N1→N5. The Context Builder,
-Conflict Detector (the differentiator), and guardrail nodes are Week 3–4 and
-slot into the same `StateGraph` as additional nodes.
+The current live pipeline is the 6-node chain N1→N6 (conflict detection is gated
+on comparison/guidance-intent queries — DEC-007). The Context Builder and
+guardrail nodes remain planned (Week 4+) and slot into the same `StateGraph`.
 
 ---
 
@@ -75,7 +71,7 @@ raw query
        │
        ▸ Node 1 ✅ Query Understanding (Haiku)
        │   - Rewrite to a self-contained, retrieval-friendly query
-       │   - Extract ticker hint (e.g. "AAPL")
+       │   - Extract ticker hint + temporal reference (drives query-relative recency)
        │
        ▸ Node 2 ✅ Router (Haiku, 3-path)
        │   - Classify into {earnings_analysis, financial_metrics, risk_and_events}
@@ -85,35 +81,35 @@ raw query
        │   - Qdrant native RRF fusion: dense (voyage-finance-2) + BM25 sparse
        │   - One server-side query; prefetch ~20 candidates
        │
-       ▸ Node 4 ✅ Rerank
-       │   - Cohere rerank-v3.5 (primary) → top-k
-       │   - Falls back to local ms-marco cross-encoder on any Cohere error
+       ▸ Node 4 ✅ Rerank (+ temporal boost + staleness)
+       │   - Cohere rerank-v3.5 (primary) → top-k; local ms-marco fallback on error
+       │   - Query-relative recency boost; staleness flag if evidence off-period
        │
-       ▸ Node 5 ✅ Generate (Sonnet 4.6)
+       ▸ Node 5 ✅ Detect Conflicts (the differentiator)
+       │   - Gated on comparison/guidance intent (extraction is ~14s — skip otherwise)
+       │   - Extract numeric claims → flag cross-call contradictions (precision-gated)
+       │
+       ▸ Node 6 ✅ Generate (Sonnet 4.6)
        │   - Streaming; inline [N] citations parsed to structured Citations
        │   - Abstains ("INSUFFICIENT EVIDENCE") when chunks don't support an answer
+       │   - Computes per-query cost + logs failure-mode classification
 
 streaming response to client (FastAPI /query, /query/stream → Streamlit)
 ```
 
-### Planned nodes (Week 3–4) — slot into the same graph
+### Planned nodes (Week 4+) — slot into the same graph
 
 - 🔷 **Input guardrails** (before Node 1): Presidio PII scan + jailbreak check
 - 🔷 **Context Builder** (after Node 4): DuckDB JOIN for fundamentals; OHLCV
-  event-window enrichment (universal context, per DEC-004 — not a router path);
-  staleness flag
-- 🔷 **Conflict Detector** (in/after Node 5): scan evidence for contradictory
-  numeric claims (revenue / EPS / guidance) with calibrated per-metric thresholds
-  — THE differentiator
-- 🔷 **Output guardrails** (after Node 5): faithfulness scoring, scope check,
-  5-category failure-mode logging, cost log
+  event-window enrichment (universal context, per DEC-004 — not a router path)
+- 🔷 **Output guardrails** (after Node 6): RAGAS faithfulness gate in the request
+  path (currently a manual/offline eval, not an inline node)
 
 ---
 
 ## State schema (LangGraph) — CURRENT
 
-Actual schema in `src/retrieval/graph_state.py` (Week-2 MVP; fields grow as
-nodes are added):
+Actual schema in `src/retrieval/graph_state.py`:
 
 ```python
 RoutingPath = Literal["earnings_analysis", "financial_metrics", "risk_and_events"]
@@ -125,24 +121,29 @@ class FinSightState(TypedDict, total=False):
     # Node 1 — Query Understanding
     rewritten_query: str
     ticker_hint: Optional[str]
+    temporal_reference: Optional[dict]   # {year, quarter} — query-relative recency
     # Node 2 — Router
     routing_path: RoutingPath
     # Node 3 — Retrieve (hybrid)
     candidates: list[RetrievedChunk]
-    # Node 4 — Rerank
+    # Node 4 — Rerank (+ temporal boost + staleness)
     reranked: list[RetrievedChunk]
-    # Node 5 — Generate
+    staleness_flag: bool
+    # Node 5 — Detect Conflicts
+    conflicts: list[dict]
+    # Node 6 — Generate
     answer: str
     citations: list[Citation]
     grounded: bool
     # Observability
     latency_ms: dict[str, int]     # per-node
     tokens: dict[str, int]
+    cost_usd: float
+    failure_mode: str
 ```
 
-**Planned additions (Week 3–4):** `sub_queries`, `temporal_reference`,
-`fundamentals_row`, `price_window`, `staleness_flag`, `conflicts`,
-`faithfulness_score`, `guardrail_flags`, `failure_mode`, `cost_usd`.
+**Planned additions (Week 4+):** `fundamentals_row`, `price_window` (Context
+Builder), `faithfulness_score`, `guardrail_flags` (inline guardrails).
 
 ---
 
@@ -154,13 +155,13 @@ class FinSightState(TypedDict, total=False):
 | `src/indexing/` | Chunk, embed (voyage/bge-m3), sparse BM25, Qdrant upsert | `chunker.py`, `embedder.py`, `ingest_vectors.py`, `qdrant_client.py` | ✅ |
 | `src/retrieval/` | Hybrid retrieval, rerank, LangGraph pipeline | `retriever.py`, `reranker.py`, `graph.py`, `graph_state.py`, `nodes.py` | ✅ |
 | `src/generation/` | Sonnet generation + inline citation parsing | `generator.py` | ✅ |
-| `src/insight/` | Evidence Conflict Detector (differentiator) | `conflict_detector.py` | 🔷 Week 3 |
-| `src/guardrails/` | Input + output safety | `input_guard.py`, `output_guard.py` | 🔷 Week 4 |
-| `src/recommendations/` | Shared-embedding related tickers | `related_tickers.py` | 🔷 Week 4 |
-| `src/evaluation/` | RAGAS + ablations + LLM compare | `ragas_runner.py`, `ablation.py`, `golden_set.py` | 🔷 Week 3 |
-| `src/utils/` | Config, logging (cost/failure trackers planned) | `config.py`, `logging.py` | ✅ |
-| `api/` | FastAPI async serving | `main.py` (`/health`, `/query`, `/query/stream`) | ✅ |
-| `ui/` | Streamlit demo (5-tab in Week 4) | `streamlit_app.py` | 🔶 single-query now |
+| `src/insight/` | Evidence Conflict Detector (differentiator) | `conflict_detector.py` | ✅ |
+| `src/guardrails/` | Input + output safety | `input_guard.py`, `output_guard.py` | 🔷 Week 4+ |
+| `src/recommendations/` | Shared-embedding related tickers | `related_tickers.py` | ✅ |
+| `src/evaluation/` | Golden set + ablations + RAGAS + faithfulness judge | `golden_set.py`, `ablation.py`, `ragas_runner.py`, `chunking_ablation.py`, `faithfulness.py`, `llm_compare.py` | ✅ |
+| `src/utils/` | Config, logging, cost + failure trackers | `config.py`, `logging.py`, `cost_tracker.py`, `failure_tracker.py` | ✅ |
+| `api/` | FastAPI async serving | `main.py` (`/health`, `/query`, `/query/stream`, `/recommend`, `/feedback`) | ✅ |
+| `ui/` | Streamlit 5-tab demo | `streamlit_app.py` | ✅ |
 
 Node functions (`query_understanding`, `router`, `retrieve`, `rerank`,
 `generate`) all live in `src/retrieval/nodes.py` — not separate files.

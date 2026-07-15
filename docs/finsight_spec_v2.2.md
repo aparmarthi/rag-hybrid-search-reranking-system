@@ -1,3 +1,7 @@
+> ⚠️ **ARCHIVED — superseded by `finsight_spec_v2.3.md`.** Kept for history only.
+> Contains obsolete plans (4-path router, GPT-4o comparison, 12–16 week scope).
+> The canonical current spec is v2.3.
+
 # FinSight — Execution Spec v2.2 (Canonical)
 
 **Multimodal Financial Evidence & Research Platform**

@@ -15,6 +15,12 @@ Each decision = Context · Options · Choice · Rationale · Trade-offs · Revis
 ## DEC-001: Dataset selection — use 4 of 5 candidate datasets, skip ahmedsta
 **Date:** 2026-04-29 (Week 1 Day 1)
 
+> **Later superseded in part:** this entry reflects the original 4-path plan
+> (earnings / metrics / price_action / news_sentiment). **DEC-004** consolidated
+> to the 3-path router (earnings_analysis / financial_metrics / risk_and_events)
+> after dataset review. Kept as-written to preserve the decision trail — read
+> DEC-001 → DEC-004 in sequence for the evolution.
+
 ### Context
 User provided 5 candidate datasets: Motley Fool earnings transcripts (tpotterer), SEC Financial Statement Data Sets (XBRL), Jackson Crow OHLCV, Aaron7sun news, ahmedsta/data-retreiver. v2.3 spec demands 4 distinct modalities to make the "multimodal financial evidence" claim defensible in interviews.
 
