@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinSight — Technical Deep-Dive Drill Guide</title>
+<style>
+  :root {
+    --bg:#0f1116; --card:#181b22; --edge:#262b36; --ink:#e6e9ef; --mut:#9aa4b2;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --accent:#58a6ff;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; padding:32px 20px 80px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:34px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--edge); }
+  .sub { color:var(--mut); margin:0 0 24px; }
+  .card { background:var(--card); border:1px solid var(--edge); border-radius:10px;
+    padding:16px 18px; margin:14px 0; }
+  .q { font-weight:600; color:var(--accent); margin:0 0 8px; }
+  .lbl { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.4px;
+    padding:2px 8px; border-radius:20px; text-transform:uppercase; margin-right:6px; }
+  .measured { background:rgba(63,185,80,.15); color:var(--ok); border:1px solid var(--ok); }
+  .estimated { background:rgba(210,153,34,.15); color:var(--warn); border:1px solid var(--warn); }
+  .notbuilt { background:rgba(248,81,73,.15); color:var(--bad); border:1px solid var(--bad); }
+  .num { font-family:"SF Mono",Menlo,Consolas,monospace; color:#79c0ff; font-weight:600; }
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:14px; }
+  th,td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--edge); }
+  th { color:var(--mut); font-weight:600; }
+  code { font-family:"SF Mono",Menlo,Consolas,monospace; background:#0d1017;
+    padding:1px 5px; border-radius:4px; font-size:13px; color:#c9d1d9; }
+  .say { border-left:3px solid var(--accent); padding:8px 14px; margin:10px 0;
+    background:rgba(88,166,255,.06); font-style:italic; }
+  .trap { border-left:3px solid var(--bad); padding:8px 14px; margin:10px 0;
+    background:rgba(248,81,73,.06); }
+  .meta { background:rgba(210,153,34,.08); border:1px solid var(--warn); border-radius:10px;
+    padding:14px 18px; margin:20px 0; }
+  .legend { font-size:13px; color:var(--mut); margin:8px 0 0; }
+  .legend span { margin-right:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>FinSight — Technical Deep-Dive Drill Guide</h1>
+<p class="sub">Real, repo-verified values for the specifics a dogfooding peer / research-adjacent IC will probe.
+Every number is tagged so you know when you're quoting a <b>measured</b> fact vs an <b>estimate</b> vs
+something <b>not built</b>. Verified against the codebase — not reconstructed.</p>
+
+<div class="legend">
+  <span><span class="lbl measured">measured</span> real number from the repo/eval output</span>
+  <span><span class="lbl estimated">estimated</span> reasoned/spec figure, not benchmarked</span>
+  <span><span class="lbl notbuilt">not built</span> premise assumed it; it doesn't exist</span>
+</div>
+
+<div class="meta">
+  <b>⚠️ The meta-rule (read first).</b> For any value you can't recall cold:
+  <i>"I'd have to check the exact number, but the reasoning was X."</i> That beats a confident wrong
+  number every time. And note: <b>four of the probes below assume things this project does NOT do</b>
+  (a chunk-size MRR regression, cost-tiered rerank / "~40%", a GPT-4o judge, structured-data lookup
+  routing). The honest correction <i>is</i> the strong answer — it shows you know your own system.
+</div>
+
+<!-- ============ GOLD SET (most probed) ============ -->
+<h2>1. Gold-set — size &amp; construction <span class="lbl measured">measured</span></h2>
+<div class="card">
+  <p class="q">"How big is your eval set and how did you build it?" (the most-probed question)</p>
+  <table>
+    <tr><th>Fact</th><th>Value</th></tr>
+    <tr><td>Total queries</td><td class="num">50</td></tr>
+    <tr><td>Corpus-grounded</td><td class="num">40</td></tr>
+    <tr><td>Adversarial</td><td class="num">5</td></tr>
+    <tr><td>Abstention (out-of-scope/period)</td><td class="num">5</td></tr>
+  </table>
+  <div class="say">"50-query golden set: 40 grounded, 5 adversarial, 5 abstention. The 40 grounded ones
+  I <b>generated from real chunks</b> — sample a chunk, have Haiku write a question answerable from it —
+  so a relevant chunk provably exists for Recall/NDCG. The 5 adversarial and 5 abstention I hand-authored
+  so the 'should refuse' ground truth is unambiguous. Relevance labels come from <b>LLM pooling</b>:
+  union the top-k across all retriever configs, judge each relevant/not — standard IR pooling."</div>
+  <div class="trap"><b>If probed on rigor:</b> be honest — "labels are LLM-judged, not human-gold. For a
+  production system I'd validate a human-labeled subset to calibrate the judge. 50 queries is enough to
+  show direction, not a publishable benchmark."</div>
+</div>
+
+<!-- ============ CHUNK SIZE ============ -->
+<h2>2. Chunk sizes &amp; the "MRR regression" <span class="lbl measured">measured</span> <span class="lbl notbuilt">premise wrong</span></h2>
+<div class="card">
+  <p class="q">"What were your chunk sizes before/after the MRR regression, and which direction?"</p>
+  <table>
+    <tr><th>Fact</th><th>Value</th></tr>
+    <tr><td>Chunk target size</td><td class="num">600 tokens</td></tr>
+    <tr><td>Overlap</td><td class="num">80 tokens</td></tr>
+    <tr><td>Strategy</td><td>per-corpus: transcripts → <code>paragraph</code>; MD&amp;A → <code>sentence</code>; 8-K → <code>fixed_400</code></td></tr>
+  </table>
+  <div class="trap"><b>Premise correction (say this):</b> "There wasn't a chunk-size-driven MRR regression —
+  I want to be accurate. Chunks are a fixed 600 tokens with 80 overlap. What you might be thinking of is a
+  <i>different</i> moment: when I switched the embedder from bge-m3 to voyage-finance-2, the cosine scores
+  <i>looked</i> lower and I thought retrieval regressed — but that was a cross-model score-scale difference,
+  not a real regression (scores aren't comparable across embedding models). I verified the model still
+  discriminated relevant from irrelevant correctly. That's documented as DEC-012."</div>
+  <div class="say"><b>The 600-token reasoning:</b> "I went 600 not the default 400 — it roughly halves the
+  chunk count and keeps whole speaker turns / Q&amp;A pairs intact in transcripts, without hurting retrieval
+  at this scale."</div>
+</div>
+
+<!-- ============ RERANK DELTA ============ -->
+<h2>3. Rerank ablation — the actual delta <span class="lbl measured">measured</span></h2>
+<div class="card">
+  <p class="q">"How much did reranking actually lift retrieval?"</p>
+  <table>
+    <tr><th>Config</th><th>Recall@5</th><th>MRR</th><th>NDCG@10</th><th>p50 latency</th></tr>
+    <tr><td>Dense only (voyage-finance-2)</td><td class="num">0.578</td><td class="num">0.652</td><td class="num">0.584</td><td>148 ms</td></tr>
+    <tr><td>Hybrid (BM25+dense RRF)</td><td class="num">0.655</td><td class="num">0.797</td><td class="num">0.718</td><td>145 ms</td></tr>
+    <tr><td>Hybrid + Cohere rerank</td><td class="num">0.650</td><td class="num">0.804</td><td class="num">0.743</td><td>283 ms</td></tr>
+  </table>
+  <p><b>Headline:</b> hybrid+rerank vs dense-only = <span class="num">+27.4% NDCG@10</span> (n=40).</p>
+  <div class="say"><b>The nuance that shows you read your own numbers:</b> "The big jump is
+  dense→hybrid (0.58→0.72 NDCG). Rerank <i>alone</i> — hybrid→hybrid+rerank — is smaller and interesting:
+  it lifts <b>ordering</b> (MRR 0.797→0.804, NDCG 0.718→0.743) but <b>Recall actually dips</b> 0.655→0.650.
+  That makes sense — the cross-encoder reorders the top set, it doesn't retrieve more. And it doubles p50
+  latency (145→283ms). So rerank is an ordering-quality-vs-latency trade, not a recall win."</div>
+</div>
+
+<!-- ============ MODEL ROUTING ============ -->
+<h2>4. Model routing — Haiku vs Sonnet <span class="lbl measured">split is real</span> <span class="lbl estimated">"~55%" is estimated</span></h2>
+<div class="card">
+  <p class="q">"What runs on the cheap model vs the expensive one? Is the ~55% saving measured?"</p>
+  <table>
+    <tr><th>Node</th><th>Model</th></tr>
+    <tr><td>Query understanding (rewrite + ticker + temporal)</td><td><b>Haiku 4.5</b> (cheap)</td></tr>
+    <tr><td>Router (3-path classify)</td><td><b>Haiku 4.5</b> (cheap)</td></tr>
+    <tr><td>Conflict detection (claim extraction)</td><td><b>Sonnet 4.6</b></td></tr>
+    <tr><td>Generation (final cited answer)</td><td><b>Sonnet 4.6</b></td></tr>
+  </table>
+  <div class="say">"Classification and rewrite go to Haiku — 10× cheaper input; only reasoning
+  (conflict extraction, synthesis) uses Sonnet. That's the cost-routing design."</div>
+  <div class="trap"><b>Be honest on the number:</b> "The <b>split is real and in the code</b>. The '~55% cost
+  reduction' figure is from my <b>spec — it's a per-token estimate, not a measured A/B</b>. I have a
+  per-query cost tracker wired (<code>cost_tracker.py</code>) that <i>could</i> measure it live; I haven't
+  run the Haiku-only-vs-Sonnet-only comparison to confirm the exact %." Never claim 55% as measured.</div>
+</div>
+
+<!-- ============ COST-TIER RERANK ============ -->
+<h2>5. Cost-tier rerank trigger / "~40%" <span class="lbl notbuilt">not built as described</span></h2>
+<div class="card">
+  <p class="q">"What routes a query to cheap vs expensive rerank? Is the ~40% measured?"</p>
+  <div class="trap"><b>Premise correction (say this):</b> "There's no cheap-vs-expensive <i>rerank</i>
+  tiering — I don't want to invent one. Reranking is always Cohere <code>rerank-v3.5</code>, with a
+  <b>local ms-marco cross-encoder as a fallback only on Cohere error</b> (graceful degradation), not a
+  cost decision. So there's no '40%' rerank figure.
+  <br><br>What <b>is</b> gated for cost is the <b>conflict detector</b>: its claim-extraction Sonnet call
+  costs ~14s, so it only fires when the query shows comparison/guidance intent (a keyword gate —
+  'guidance', 'versus', 'compare', 'revised'…). Plain queries skip it entirely (0 ms). That's the real
+  cost-gating story."</div>
+</div>
+
+<!-- ============ STRUCTURED DATA ============ -->
+<h2>6. Structured data (XBRL / OHLCV) — lookup vs embed <span class="lbl notbuilt">not routed to lookup</span></h2>
+<div class="card">
+  <p class="q">"Did you route XBRL/OHLCV to a structured lookup, or embed everything?"</p>
+  <div class="trap"><b>Honest answer:</b> "Neither, currently — and I'll be precise. Only <b>transcripts</b>
+  are chunked, embedded, and on the live retrieval paths (15,023 chunks). SEC fundamentals and OHLCV are
+  <b>ingested into DuckDB but not yet queried</b> — the <code>financial_metrics</code> and
+  <code>risk_and_events</code> router paths exist and route correctly, but <b>abstain</b> because their
+  corpus isn't wired up. I made that honest rather than fake multi-source."
+  <br><br><b>The design intent (shows you thought about it):</b> "The <i>right</i> design is exactly what
+  you're implying — structured numbers (revenue, EPS) belong in a SQL/DuckDB lookup, not a vector index;
+  you don't embed a number you can look up exactly. That's the roadmap: a Context-Builder node that JOINs
+  DuckDB fundamentals by (ticker, period). It also unlocks the <b>cross-source</b> conflict detector —
+  transcript claim vs filed number — which is the stronger version of the differentiator."</div>
+</div>
+
+<!-- ============ CHECKPOINTER ============ -->
+<h2>7. Checkpointer / persistence <span class="lbl notbuilt">none</span></h2>
+<div class="card">
+  <p class="q">"Are you using a LangGraph checkpointer? Which persistence?"</p>
+  <div class="trap"><b>Honest answer:</b> "No checkpointer. The graph is <b>stateless per request</b> —
+  each query is a fresh <code>StateGraph.invoke()</code>, no <code>MemorySaver</code>/<code>SqliteSaver</code>,
+  no cross-turn persistence. It's a single-shot Q&amp;A pipeline, not a multi-turn agent, so there's no
+  conversation state to checkpoint."
+  <br><br><b>When I'd add one:</b> "A checkpointer earns its place when you have (a) multi-turn conversation
+  memory, (b) long-running/interruptible runs you want to resume, or (c) human-in-the-loop approval
+  mid-graph. None apply to a stateless single-query RAG call. If I added last-N-turn follow-ups, I'd wire
+  <code>MemorySaver</code> (or SqliteSaver for durability) keyed by a session id."</div>
+</div>
+
+<!-- ============ JUDGE MODEL ============ -->
+<h2>8. Judge model <span class="lbl measured">Claude, not GPT-4o</span></h2>
+<div class="card">
+  <p class="q">"What's your eval judge model? (your notes said GPT-4o)"</p>
+  <div class="trap"><b>Correction — keep this consistent:</b> "The judge is <b>Claude (sonnet-4-6)</b>, not
+  GPT-4o. Two places use an LLM judge: RAGAS faithfulness (Claude judge + Voyage embeddings) and the
+  ablation's relevance-pooling judge (also Claude). GPT-4o appears in my <i>spec</i> as a planned
+  Claude-vs-GPT comparison, but I <b>deliberately skipped that bake-off</b> — GPT-4o is two generations
+  stale now, and a rigorous cross-model comparison needs a bigger labeled set than 50 queries to be
+  meaningful. So: judge = Claude, everywhere, consistently."</div>
+  <p><b>Faithfulness result:</b> RAGAS <span class="num">0.806</span> (n=40) — passes the 0.80 gate.</p>
+</div>
+
+<!-- ============ CONFLICT DETECTION ============ -->
+<h2>9. Conflict detection — dedicated step or prompt instruction? <span class="lbl measured">dedicated step</span></h2>
+<div class="card">
+  <p class="q">"Is conflict detection a real step, or just an instruction in the synthesis prompt?"</p>
+  <div class="say">"It's a <b>dedicated node with its own Sonnet call</b> — not a line in the generation
+  prompt. Two steps: (1) a structured extraction call pulls every numeric claim from the evidence
+  (metric, subject, value, period, is_guidance); (2) pure Python pairwise-compares them with per-metric
+  thresholds. Keeping it separate from generation is deliberate — the extraction is structured/verifiable,
+  and I can unit-test the comparison logic without an LLM."</div>
+  <p><b>The precision story (your best debugging narrative):</b> naive version fired
+  <span class="num">6</span> conflicts on query one — <b>all false positives</b>. Four gates, each killing
+  a class: <b>different-chunk</b> (not guidance ranges like "down 15% to 18%"), <b>comparable-period</b>
+  (not quarter-vs-full-year), <b>same-subject</b> (not Products-8% vs Services-17%), <b>different-date</b>
+  (a real conflict is guidance in one call vs actual in a <i>later</i> one). Result: 6 → 0 false positives;
+  fires correctly on a genuine guided-15%/delivered-9% case.</p>
+  <p><b>Thresholds:</b> revenue &gt;3%, EPS &gt;5%, margin &gt;1pp, growth/guidance &gt;2pp.
+  <span class="lbl estimated">hand-set</span> — reasoned defaults, not calibrated on labeled pairs (the
+  spec's 20+20 calibration is future work; say so if asked).</p>
+</div>
+
+<!-- ============ QUICK REFERENCE ============ -->
+<h2>Quick-reference card (memorize the measured ones)</h2>
+<div class="card">
+  <table>
+    <tr><th>Probe</th><th>Answer</th><th>Tag</th></tr>
+    <tr><td>Gold set</td><td>50 = 40 grounded + 5 adversarial + 5 abstention</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>Chunk size</td><td>600 tokens / 80 overlap, per-corpus strategy</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>Headline lift</td><td>+27.4% NDCG (dense→hybrid+rerank)</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>Rerank-alone</td><td>+MRR/NDCG, −Recall, 2× latency</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>Faithfulness</td><td>RAGAS 0.806 (Claude judge)</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>Model routing</td><td>Haiku: understand+route · Sonnet: conflict+generate</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>"~55% cost saving"</td><td>spec estimate, NOT measured</td><td><span class="lbl estimated">E</span></td></tr>
+    <tr><td>Conflict thresholds</td><td>rev 3% / EPS 5% / margin 1pp / guidance 2pp — hand-set</td><td><span class="lbl estimated">E</span></td></tr>
+    <tr><td>Cost-tiered rerank / "40%"</td><td>doesn't exist (conflict node is the gated part)</td><td><span class="lbl notbuilt">N</span></td></tr>
+    <tr><td>Chunk-size MRR regression</td><td>never happened (was DEC-012 score-scale, diff issue)</td><td><span class="lbl notbuilt">N</span></td></tr>
+    <tr><td>Structured XBRL/OHLCV lookup</td><td>not wired — transcripts only, others abstain</td><td><span class="lbl notbuilt">N</span></td></tr>
+    <tr><td>Checkpointer</td><td>none — stateless per-request invoke</td><td><span class="lbl notbuilt">N</span></td></tr>
+    <tr><td>Judge model</td><td>Claude sonnet-4-6 (NOT GPT-4o)</td><td><span class="lbl measured">M</span></td></tr>
+    <tr><td>Conflict detection</td><td>dedicated node + own Sonnet extraction call</td><td><span class="lbl measured">M</span></td></tr>
+  </table>
+</div>
+
+<p class="sub" style="margin-top:30px;">Generated from the FinSight repo — verified against source, eval JSON, and decisions.md.
+Tags: <b>M</b>=measured, <b>E</b>=estimated, <b>N</b>=not built as premised.</p>
+
+</div>
+</body>
+</html>
