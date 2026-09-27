@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinSight — Demo Script &amp; Architecture</title>
+<style>
+  :root{
+    --ink:#0b2545;--muted:#5b6b82;--line:#dfe6ef;--bg:#f6f8fb;--card:#fff;
+    --brand:#1b6ef3;--brand-soft:#eaf2ff;--ok:#127a3d;--ok-soft:#e6f4ec;
+    --warn:#8a5a00;--warn-soft:#fdf3e0;--stop:#a11a1a;--stop-soft:#fbeaea;
+    --mono:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.5;font-size:15px}
+  header{background:linear-gradient(135deg,#0b2545,#1b6ef3);color:#fff;padding:36px 40px}
+  header h1{margin:0 0 6px;font-size:26px}
+  header p{margin:0;opacity:.9;max-width:820px}
+  header .meta{margin-top:14px;font-size:13px;opacity:.85}
+  header .meta code{background:rgba(255,255,255,.15);padding:2px 6px;border-radius:4px;color:#fff}
+  main{max-width:960px;margin:0 auto;padding:28px 24px 80px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:24px 26px;margin:20px 0;box-shadow:0 1px 2px rgba(11,37,69,.04)}
+  h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .n{background:var(--brand);color:#fff;width:26px;height:26px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--ink)}
+  .sub{color:var(--muted);margin:0 0 14px;font-size:13.5px}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;
+    letter-spacing:.02em;vertical-align:middle}
+  .pill.haiku{background:var(--brand-soft);color:var(--brand)}
+  .pill.hybrid{background:var(--ok-soft);color:var(--ok)}
+  .pill.conflict{background:var(--warn-soft);color:var(--warn)}
+  .pill.abstain{background:var(--stop-soft);color:var(--stop)}
+  .turn{border-left:3px solid var(--line);padding:2px 0 2px 16px;margin:14px 0}
+  .turn.user{border-color:var(--brand)}
+  .turn .who{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .turn .say{font-family:var(--mono);font-size:13.5px;background:#f2f5f9;border-radius:8px;
+    padding:9px 12px;margin-top:4px;display:block}
+  .turn.user .say{background:var(--brand-soft)}
+  .expect{font-size:13px;color:var(--muted);margin-top:6px}
+  .expect b{color:var(--ink)}
+  .watch{background:#fbfcfe;border:1px dashed var(--line);border-radius:8px;padding:10px 14px;
+    margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .watch b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+  td code,.mono{font-family:var(--mono);font-size:12.5px}
+  .num{font-family:var(--mono);color:var(--brand);font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .kv{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fbfcfe}
+  .kv h4{margin:0 0 8px;font-size:13px;color:var(--brand);text-transform:uppercase;letter-spacing:.04em}
+  .kv ul{margin:0;padding-left:18px}
+  .kv li{margin:3px 0;font-size:13px}
+  .flowbox{font-family:var(--mono);font-size:12px;background:#0b2545;color:#d7e3f5;border-radius:10px;
+    padding:16px 18px;overflow-x:auto;line-height:1.7}
+  .flowbox .u{color:#7fb2ff}.flowbox .a{color:#84e6a8}.flowbox .w{color:#f5c775}.flowbox .e{color:#ff9d9d}
+  .note{background:var(--brand-soft);border-radius:8px;padding:12px 16px;font-size:13px;margin-top:12px}
+  .note b{color:var(--brand)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  @media print{body{background:#fff;font-size:11.5px}section{box-shadow:none;break-inside:avoid}
+    header{background:#0b2545 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .flowbox,.pill,.kv,.watch{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+  footer{max-width:960px;margin:0 auto;padding:0 24px 60px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>FinSight</h1>
+  <p>A grounded financial-evidence engine over earnings-call transcripts. A single query flows through a six-node LangGraph pipeline — understand → route → hybrid retrieve → rerank → detect conflicts → generate — that cites every claim, refuses when it can't ground an answer, flags stale evidence, and surfaces numeric contradictions instead of averaging them.</p>
+  <div class="meta">Corpus: <code>15,023 chunks · 76 tickers · 2019–2023</code> &nbsp;·&nbsp; Store: <code>Qdrant Cloud (dense + BM25)</code> &nbsp;·&nbsp; Models: <code>Haiku 4.5 + Sonnet 4.6</code> &nbsp;·&nbsp; Deployed: <code>Render + FastAPI + Streamlit</code></div>
+</header>
+
+<main>
+
+<!-- ============ DEMO SCRIPT ============ -->
+<section>
+  <h2><span class="n">▶</span> Live Demo Script</h2>
+  <p class="sub">Present in order, one Streamlit tab per block: what you type, what the system should return, and what to point at. Every query resolves against the live 15,023-chunk corpus. Open the deployed UI (or <span class="mono">streamlit run ui/streamlit_app.py</span> against the API on <span class="mono">$API_URL</span>).</p>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#1b6ef3"></i> Haiku (understand / route)</span>
+    <span><i class="dot" style="background:#127a3d"></i> Hybrid retrieve + rerank</span>
+    <span><i class="dot" style="background:#8a5a00"></i> Conflict detector (gated)</span>
+    <span><i class="dot" style="background:#a11a1a"></i> Honest abstention</span>
+  </div>
+
+  <!-- Tab 1 -->
+  <h3>1 · Ask — grounded, cited answer <span class="pill haiku">Haiku route</span> <span class="pill hybrid">Hybrid + rerank</span></h3>
+  <div class="turn user"><span class="who">You (Tab 1 · Ask)</span><span class="say">What did companies say about COVID-19 supply chain disruptions?</span></div>
+  <div class="turn"><span class="who">FinSight</span><span class="say">Streams a synthesized answer with inline <span class="mono">[1] [2]</span> citations, a green <b>Grounded ✓</b> badge, the routing path, and expandable retrieved evidence.</span></div>
+  <div class="expect"><b>Point out:</b> every factual claim carries an inline <span class="mono">[N]</span> citation parsed to a structured source — the answer is grounded in retrieved chunks, not the model's memory. Citations are parsed post-hoc, not forced tool-use, which is what keeps streaming fast (first token ~1.3s vs ~11s).</div>
+  <div class="watch"><b>Watch the sidebar:</b> API healthy · <b>15,023 chunks</b>, and the per-query metrics row (latency, output tokens, est. cost, conflicts). Alt query: <b>"Microsoft cloud revenue growth"</b>.</div>
+
+  <!-- Tab 2 -->
+  <h3>2 · Conflict detector — the differentiator <span class="pill conflict">Sonnet · gated on intent</span></h3>
+  <div class="turn user"><span class="who">You (Tab 2 · Conflict)</span><span class="say">Did company revenue guidance match actual results?</span></div>
+  <div class="turn"><span class="who">FinSight</span><span class="say">Answers, then — when the evidence genuinely disagrees — surfaces an ⚠️ <b>Evidence conflict</b>: e.g. guided +15% vs delivered +9% on the same metric across two calls.</span></div>
+  <div class="expect"><b>Point out:</b> this is a <b>dedicated node with its own Sonnet extraction call</b>, not a line in the generation prompt. It pulls structured numeric claims, then pure-Python pairwise-compares them behind four precision gates (different-chunk, comparable-period, same-subject, different-date) that took a naive 6-false-positives-on-query-one down to 0.</div>
+  <div class="watch"><b>Cost gate:</b> the ~14s extraction fires <b>only</b> on comparison/guidance intent (keywords: guidance, versus, revised, compare). Plain queries skip it entirely (0 ms). Other examples in the dropdown: "How did management revise its full-year outlook over the year?"</div>
+
+  <!-- Tab 3 -->
+  <h3>3 · Related tickers — recommendation on shared infra <span class="pill hybrid">cosine-NN · no LLM</span></h3>
+  <div class="turn user"><span class="who">You (Tab 3 · Related tickers)</span><span class="say">AAPL</span></div>
+  <div class="turn"><span class="who">FinSight</span><span class="say">Lists the tickers most similar to AAPL by earnings-call language, each with a similarity score.</span></div>
+  <div class="expect"><b>Point out:</b> related tickers come from cosine-nearest-neighbor over the <b>same voyage-finance-2 vectors</b> that power retrieval — a per-ticker centroid, no separate model. The talking point: "retrieval and recommendation are the same nearest-neighbor problem over one embedding space."</div>
+  <div class="watch"><b>Negative test:</b> a ticker outside the 76-name universe → "not in the corpus universe" rather than a fabricated list.</div>
+
+  <!-- Tab 4 -->
+  <h3>4 · Observability — every query is measured <span class="pill haiku">per-node trace</span></h3>
+  <div class="turn user"><span class="who">You (Tab 4 · Observability)</span><span class="say">Microsoft cloud revenue growth</span></div>
+  <div class="turn"><span class="who">FinSight</span><span class="say">Total latency, est. cost, routing path, failure-mode label, plus the per-node latency breakdown and token counts.</span></div>
+  <div class="expect"><b>Point out:</b> the per-node latency makes the <b>cost-routing story</b> visible — cheap Haiku for understand + route, a single Sonnet call for synthesis. Cost lands at ~<span class="num">$0.005</span>/query, and every query is tagged with a failure mode for regression tracking.</div>
+  <div class="watch"><b>Honest note:</b> the "~55% cost saving" is a per-token <b>spec estimate</b>, not a measured A/B — the split is real in code, the exact % isn't benchmarked. Say that if probed.</div>
+
+  <!-- Tab 5 -->
+  <h3>5 · Abstention — knows what it doesn't know <span class="pill abstain">refuses, doesn't guess</span></h3>
+  <div class="turn user"><span class="who">You (Tab 1 · Ask)</span><span class="say">What did Apple say about iPhone sales in 2015?</span></div>
+  <div class="turn"><span class="who">FinSight</span><span class="say">"INSUFFICIENT EVIDENCE" — the corpus starts in 2019, so it abstains rather than inventing a figure. Badge flips to <b>Abstained</b>.</span></div>
+  <div class="expect"><b>Point out:</b> for a regulated buyer (SEC Rule 10b-5), a confident-but-wrong number is worse than a refusal — so the abstention <b>is</b> the product. The generator refuses when retrieved chunks don't support an answer.</div>
+  <div class="watch"><b>More refusals to try:</b> "What is the current stock price of Tesla today?" (not a transcript), "Should I buy or sell Nvidia stock?" (investment-advice guardrail), "Summarize the company's 2025 annual guidance" (after corpus, ends 2023).</div>
+
+  <div class="note"><b>The design thesis (say it aloud):</b> probabilistic where language is fuzzy (Haiku routing, Sonnet synthesis), deterministic where correctness must be auditable (RRF fusion, Python conflict comparison, inline citation parsing). Trust gates — grounding, abstention, conflict surfacing, staleness flags — are treated as first-class product features, not afterthoughts.</div>
+</section>
+
+<!-- ============ ARCHITECTURE GLANCE ============ -->
+<section>
+  <h2><span class="n">◧</span> Architecture at a Glance</h2>
+  <p class="sub">Every component below is verified from source in this repo — the LangGraph nodes, retriever, reranker, conflict detector, generator, and eval suite.</p>
+
+  <div class="flowbox">
+<span class="u">User Query</span> → <b>StateGraph.invoke()</b> (LangGraph · linear 6-node DAG · stateless per request)
+   ├─ <span class="u">Node 1 · Understand</span>  → <span class="a">Haiku 4.5</span>   <span class="a">(rewrite + ticker hint + temporal ref)</span>
+   ├─ <span class="u">Node 2 · Route</span>      → <span class="a">Haiku 4.5</span>   <span class="a">(3-path classify · cost routing)</span>
+   ├─ <span class="u">Node 3 · Retrieve</span>   → <span class="a">Qdrant hybrid</span> <span class="a">(dense voyage + BM25 · native RRF fusion)</span>
+   ├─ <span class="u">Node 4 · Rerank</span>     → <span class="a">Cohere rerank-v3.5</span> <span class="a">(+ temporal boost · ms-marco fallback)</span>
+   ├─ <span class="u">Node 5 · Conflicts</span>  → <span class="w">Sonnet 4.6</span>   <span class="w">(GATED on comparison intent · ~14s)</span>
+   └─ <span class="u">Node 6 · Generate</span>   → <span class="w">Sonnet 4.6</span>   <span class="w">(inline [N] citations · streaming)</span>
+                        → <span class="e">"INSUFFICIENT EVIDENCE"</span> <span class="e">(abstains when ungrounded)</span>
+  </div>
+
+  <div class="grid" style="margin-top:18px">
+    <div class="kv">
+      <h4>Retrieval</h4>
+      <ul>
+        <li><b>retriever.py</b> — one Qdrant call, two Prefetch legs</li>
+        <li>Dense (voyage-finance-2) + BM25 sparse, fused server-side by <span class="mono">FusionQuery(RRF)</span></li>
+        <li>Hydrates full chunk text from payload (deploy) or DuckDB (local)</li>
+        <li><b>reranker.py</b> — Cohere cross-encoder → local ms-marco → raw order (never fails)</li>
+      </ul>
+    </div>
+    <div class="kv">
+      <h4>The differentiator</h4>
+      <ul>
+        <li><b>conflict_detector.py</b> — dedicated Sonnet extraction call</li>
+        <li>Structured <span class="mono">NumericClaim</span>s → Python pairwise compare</li>
+        <li>Four precision gates killed 6 false positives → 0</li>
+        <li>Thresholds: rev &gt;3%, EPS &gt;5%, margin &gt;1pp, guidance &gt;2pp</li>
+      </ul>
+    </div>
+    <div class="kv">
+      <h4>Corpus &amp; stores <span style="font-weight:400;color:var(--muted)">(two-store split)</span></h4>
+      <ul>
+        <li><b>Qdrant Cloud</b> — 15,023 pts · dense + BM25 + text payload</li>
+        <li><b>DuckDB</b> — columnar system-of-record: documents, chunks</li>
+        <li>Chunks: 600 tokens / 80 overlap · per-corpus strategy</li>
+        <li>SEC fundamentals + OHLCV ingested but not yet on retrieval paths</li>
+      </ul>
+    </div>
+    <div class="kv">
+      <h4>Serving &amp; observability</h4>
+      <ul>
+        <li><b>FastAPI</b> — /health, /query, /query/stream, /recommend, /feedback</li>
+        <li>Lazy singletons + lifespan warmup (no cold-start on first query)</li>
+        <li><b>LangSmith</b> per-node tracing; per-node latency in the response</li>
+        <li>Per-query cost + 5-mode failure classification (JSONL)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Measured results <span style="font-weight:400;color:var(--muted)">(50-query golden set · n=40 grounded)</span></h3>
+  <table>
+    <tr><th>Config</th><th>Recall@5</th><th>MRR</th><th>NDCG@10</th><th>p50 latency</th></tr>
+    <tr><td>Dense only (voyage-finance-2)</td><td class="num">0.578</td><td class="num">0.652</td><td class="num">0.584</td><td>148 ms</td></tr>
+    <tr><td>Hybrid (BM25 + dense RRF)</td><td class="num">0.655</td><td class="num">0.797</td><td class="num">0.718</td><td>145 ms</td></tr>
+    <tr><td>Hybrid + Cohere rerank</td><td class="num">0.650</td><td class="num">0.804</td><td class="num">0.743</td><td>283 ms</td></tr>
+  </table>
+  <div class="note"><b>Headline:</b> hybrid+rerank vs dense-only = <b>+27.4% NDCG@10</b>. The nuance: the big jump is dense→hybrid; rerank <em>alone</em> lifts ordering (MRR/NDCG) but dips Recall and doubles p50 latency — an ordering-vs-latency trade, not a recall win. Faithfulness: <b>RAGAS 0.806</b> (Claude judge, n=40) — passes the 0.80 gate.</div>
+
+  <h3>What is <em>not</em> used — and why</h3>
+  <table>
+    <tr><th>Capability</th><th>Status</th><th>Rationale</th></tr>
+    <tr><td><b>Structured XBRL / OHLCV lookup</b></td><td>Ingested, not wired</td><td>Only transcripts are on the live retrieval paths. The <span class="mono">financial_metrics</span> / <span class="mono">risk_and_events</span> router paths route correctly but <b>abstain</b> — made honest rather than faking multi-source.</td></tr>
+    <tr><td><b>LangGraph checkpointer</b></td><td>Not used</td><td>Single-shot Q&amp;A, stateless per request — no multi-turn memory to persist. A checkpointer earns its place only with conversation memory or human-in-the-loop.</td></tr>
+    <tr><td><b>Forced tool-use citations</b></td><td>Rejected</td><td>Buffers the whole JSON and kills streaming (first token 11s→1.3s). Inline <span class="mono">[N]</span> markers parsed post-hoc give structured citations <em>and</em> streaming.</td></tr>
+    <tr><td><b>Cross-model judge (GPT-4o)</b></td><td>Skipped</td><td>Judge is Claude everywhere for consistency. A rigorous cross-model bake-off needs a bigger labeled set than 50 queries to mean anything.</td></tr>
+  </table>
+  <div class="note"><b>Roadmap note (worth saying aloud):</b> the right next step is a Context-Builder node that JOINs DuckDB fundamentals by (ticker, period) — you don't embed a number you can look up exactly. That also unlocks the stronger <b>cross-source</b> conflict detector: transcript claim vs filed number. Scoped as future work, not shoehorned in now.</div>
+</section>
+
+<section>
+  <h2><span class="n">✦</span> The One-Liner</h2>
+  <p style="font-size:15.5px;margin:6px 0 0">
+    "A six-node LangGraph RAG pipeline over earnings-call transcripts that's <b>probabilistic where language is fuzzy</b> — Haiku routing, Sonnet synthesis — and <b>deterministic where correctness must be auditable</b>: native RRF hybrid retrieval, a dedicated conflict detector with Python precision gates, and inline-parsed citations. It cites every claim, refuses when it can't ground one, and surfaces numeric contradictions instead of averaging them — because for a regulated buyer, a confident-but-wrong number is worse than a refusal."
+  </p>
+</section>
+
+</main>
+<footer>
+  Generated from repo source (LangGraph nodes · retriever · reranker · conflict detector · generator · ablation + RAGAS evals). Metrics verified against eval output; corpus is public earnings-call transcripts — no PII. Print to PDF for a leave-behind.
+</footer>
+</body>
+</html>
