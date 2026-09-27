@@ -594,6 +594,36 @@ At the Week 3 Sunday cut — decide then whether MLflow lineage + multi-LLM comp
 
 ---
 
+## DEC-017: Built the deferred two-tower fine-tune + re-expressed observability in W&B Weave
+
+### Decision
+Promoted the Phase-6 "stretch" two-tower bi-encoder fine-tune (spec v2.3 "next direction") from deferred to **built**, and added a second observability path in **W&B Weave** alongside the existing LangSmith spans. Motivation: the target role band now includes CoreWeave-style training/GPU-infra roles, and CoreWeave owns Weights & Biases — so a real PyTorch fine-tune with a Weave trace tree is directly on-signal.
+
+### What was built
+- **Fine-tune** (`scripts/finetune_biencoder.py`): contrastive bi-encoder training with `MultipleNegativesRankingLoss` (in-batch negatives) over (query → positive chunk) pairs, honest before/after Recall@5 / MRR@10, CUDA/MPS/CPU device selection, model saved to `artifacts/`.
+- **Training data** (`scripts/build_finetune_pairs.py`): provider-agnostic (OpenAI/OpenRouter/Gemini) generator of analyst-question→chunk pairs, **leakage-guarded** — excludes every chunk used as a golden-set seed, so training pairs and the 40-query held-out eval never share a source chunk.
+- **Weave tracing** (`src/observability/weave_setup.py` + `@op` on all 6 graph nodes): the same retrieve→rerank→generate spans as LangSmith, re-expressed in Weave; off unless `WEAVE_ENABLED`.
+
+### Result (honest)
+Trained bge-small on **48** Gemini-generated in-domain pairs, evaluated on **40 held-out golden queries** against a **3000-chunk** pool: **Recall@5 0.825 → 0.875 (+5.0 pts)**, **MRR@10 0.736 → 0.746 (+1.0 pts)**. Modest training set → modest-but-real lift. Numbers committed to `evals/results/finetune.json`.
+
+**The debugging story:** the first run used a 300-chunk eval pool and showed the base model already at **Recall@5 = 1.000** — a ceiling that made any "lift" meaningless. Diagnosed it as an eval that was too easy (small pool + generation-bias) *and* a training set of only 32 self-split pairs. Fixed both: a realistic 3000-chunk pool and a leakage-free expanded training set evaluated on the full golden set.
+
+### Almost chose
+Framing the marginal first result (+0.0 Recall) as "fine-tuning didn't help — here's why" (a mature but weak demo). Rejected: the honest problem was eval design and training-set size, both fixable, so fixing them beat rationalizing a null result.
+
+### Interview framing
+> "I fine-tuned a bi-encoder retriever with an in-batch-negative contrastive loss on domain pairs, then measured it honestly on a held-out set against a realistic corpus pool — Recall@5 went 82.5%→87.5%. The interesting part was the *first* run: base model was at Recall ceiling because my eval pool was too small, which taught me the eval was the bug, not the model. Small training set (48 pairs), so the lift is modest but real and measured, not asserted. Next step is scaling the pairs and running it on an actual GPU."
+
+### Trade-offs
+- **Gain:** a genuine PyTorch training + Weave-observability artifact for the CoreWeave/MLE band; an honest eval-design war story.
+- **Lose:** small training set (Gemini free-tier rate limits capped generation at 48 pairs); ran on Apple MPS, not a real GPU — so no throughput/profiling story yet.
+
+### Revisit trigger
+Before leaning on this as a headline: scale to 500+ training pairs and re-run on a real GPU (CoreWeave/Colab) to add a training-throughput + Recall-curve story. Sync the W&B runs online (currently offline) so the dashboard is demoable.
+
+---
+
 ## Format notes for future entries
 
 - Write these **as they happen**, not retroactively. Retroactive entries sound fake in interviews.

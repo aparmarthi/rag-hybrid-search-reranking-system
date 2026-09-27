@@ -23,6 +23,7 @@ from functools import lru_cache
 import anthropic
 
 from src.generation.generator import Generator
+from src.observability.weave_setup import op
 from src.retrieval.graph_state import FinSightState
 from src.retrieval.reranker import Reranker
 from src.retrieval.retriever import Retriever
@@ -99,6 +100,7 @@ _QU_TOOL = {
 }
 
 
+@op
 def query_understanding(state: FinSightState) -> dict:
     """Haiku rewrites the query, extracts a ticker hint, and a temporal reference.
 
@@ -161,6 +163,7 @@ _ROUTER_TOOL = {
 }
 
 
+@op
 def router(state: FinSightState) -> dict:
     """Haiku classifies the query into one of 3 retrieval paths (cost-routing story)."""
     t = time.perf_counter()
@@ -185,6 +188,7 @@ def router(state: FinSightState) -> dict:
 
 
 # ---- Node 3: Retrieve (hybrid) ----
+@op
 def retrieve(state: FinSightState) -> dict:
     """Hybrid BM25+dense candidate pool for the (rewritten) query."""
     t = time.perf_counter()
@@ -242,6 +246,7 @@ def _apply_temporal_boost(chunks, temporal: dict | None):
 
 
 # ---- Node 4: Rerank (+ query-relative temporal boost + staleness) ----
+@op
 def rerank(state: FinSightState) -> dict:
     """Cross-encoder rerank, then apply query-relative temporal boost + staleness flag."""
     t = time.perf_counter()
@@ -269,6 +274,7 @@ def _wants_conflict_check(query: str) -> bool:
 
 
 # ---- Node 4b: Conflict Detection (the differentiator) ----
+@op
 def detect_conflicts(state: FinSightState) -> dict:
     """Scan reranked evidence for contradictory numeric claims (guidance vs actual,
     cross-quarter drift). Gated on query intent — the extraction call is ~14s, so
@@ -294,6 +300,7 @@ def detect_conflicts(state: FinSightState) -> dict:
 
 
 # ---- Node 5: Generate ----
+@op
 def generate(state: FinSightState) -> dict:
     """Sonnet generation with inline [N] citations over the reranked evidence.
     Also computes per-query cost and logs the query's failure-mode classification."""

@@ -302,6 +302,7 @@ finsight/
 - **Week 3** — ✅ Evidence conflict detector (precision-gated), 50-query golden set, retrieval ablation (**hybrid+rerank +27.4% NDCG** vs dense), RAGAS faithfulness (**0.806**, passes 0.80 gate), chunking ablation, 12 unit tests, lightweight CI (lint + import-guard + tests). 🔷 Skipped by choice: Claude-vs-GPT LLM bake-off (stale target), MLflow (one-shot ablations → git-versioned JSON instead).
 - **Week 4** — ✅ Related-tickers recs (shared-embedding NN), per-query cost tracker, 5-mode failure logger, `/recommend` + `/feedback` endpoints, 5-tab Streamlit demo. 🔷 Remaining: live load-test run (P95, token-budget-gated), multi-turn context (deferred — low ROI on tab UI).
 - **Week 5** — Demo Loom video, blog post, LinkedIn Featured *(your distribution work)*.
+- **Bonus (training + observability)** — ✅ Two-tower bi-encoder fine-tune (`sentence-transformers`, in-batch-negative contrastive loss) on leakage-guarded domain pairs: **Recall@5 0.825 → 0.875 (+5.0 pts)** on 40 held-out golden queries vs a 3000-chunk pool ([evals/results/finetune.json](evals/results/finetune.json)). Plus **W&B Weave** tracing (`@op` on all 6 nodes) alongside LangSmith. See [DEC-017](docs/decisions.md).
 
 Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this project maps to specific roles — and how I'd deploy it at a real customer — is in [docs/interview-positioning.md](docs/interview-positioning.md) and [docs/deployment-playbook.md](docs/deployment-playbook.md).
 
@@ -309,7 +310,6 @@ Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this pr
 
 ## Future Work (scoped out of v2.3 for timeline; listed for awareness)
 
-- Two-tower bi-encoder fine-tuning on Motley Fool analyst Q&A pairs — unified retrieval + recommendation backbone
 - BEIR FiQA-2018 generalization benchmark
 - 3-LLM consensus judge (Claude + GPT + Gemini) to reduce self-preference bias
 - Arize Phoenix embedding cluster visualization

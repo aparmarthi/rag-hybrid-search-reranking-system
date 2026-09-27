@@ -221,6 +221,7 @@ artifacts/*
 !artifacts/ticker_universe.json
 mlruns/
 .mlflow/
+wandb/
 qdrant_storage/
 evals/results/*.jsonl
 evals/results/*.csv

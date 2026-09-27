@@ -22,6 +22,7 @@ from functools import lru_cache
 
 from langgraph.graph import END, START, StateGraph
 
+from src.observability.weave_setup import init_weave, op
 from src.retrieval.graph_state import FinSightState
 from src.retrieval.nodes import (
     detect_conflicts,
@@ -68,6 +69,17 @@ def _compiled():
     return g.compile()
 
 
-def run_pipeline(query: str, top_k: int = 5) -> FinSightState:
-    """Run the full pipeline for a query and return the final state."""
+@op
+def _run_traced(query: str, top_k: int) -> FinSightState:
+    """Traced root span: the node ops nest under this call in the Weave tree."""
     return _compiled().invoke({"raw_query": query, "top_k": top_k})
+
+
+def run_pipeline(query: str, top_k: int = 5) -> FinSightState:
+    """Run the full pipeline for a query and return the final state.
+
+    Initializes Weave first (no-op unless WEAVE_ENABLED) so the node ops nest
+    under a single trace, then runs the graph.
+    """
+    init_weave()
+    return _run_traced(query, top_k)
