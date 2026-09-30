@@ -102,7 +102,7 @@ def _gen_query(client: OpenAI, model: str, chunk: dict) -> str | None:
 
 
 def _golden_seed_ids() -> set[str]:
-    rows = [json.loads(l) for l in GOLDEN_PATH.read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in GOLDEN_PATH.read_text().splitlines() if line.strip()]
     return {r["seed_chunk_id"] for r in rows if r.get("seed_chunk_id")}
 
 

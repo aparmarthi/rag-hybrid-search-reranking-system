@@ -1,0 +1,47 @@
+# Lightweight CI — runs on every push/PR. No API calls, no secrets, fast + free.
+#   1. ruff lint
+#   2. serve-import guard (catches requirements-serve.txt drift — the 500-on-deploy class)
+#   3. unit tests (pure logic: chunker, conflict gates, temporal, citations)
+#
+# The expensive RAGAS faithfulness gate (>=0.75) is NOT run here — it needs API
+# keys + spends tokens per run. It's run deliberately before deploy:
+#   python -m src.evaluation.ragas_runner    (see README "Run evals")
+# This split keeps CI cheap and per-push while gating expensive evals manually.
+#
+# Dummy API-key env vars below: src/utils/config.py validates required keys at
+# import time (pydantic Field(...)). CI makes NO API calls, so placeholder values
+# just let config import succeed — real keys live in Render secrets, not here.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  ANTHROPIC_API_KEY: "ci-dummy"
+  VOYAGE_API_KEY: "ci-dummy"
+  COHERE_API_KEY: "ci-dummy"
+  LANGSMITH_API_KEY: "ci-dummy"
+  LANGSMITH_TRACING: "false"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install (serve deps + dev tools)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-serve.txt
+          pip install ruff pytest pytest-asyncio
+      - name: Lint (ruff)
+        run: ruff check src api tests scripts
+      - name: Serve-import guard (requirements-serve.txt drift)
+        run: python -m scripts.check_serve_imports
+      - name: Unit tests
+        run: python -m pytest tests/test_unit.py

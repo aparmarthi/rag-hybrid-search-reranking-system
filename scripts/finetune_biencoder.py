@@ -161,6 +161,7 @@ def main() -> None:
     print(f"Eval retrieval pool: {len(pool)} chunks.\n")
 
     import os
+
     import torch  # local: only to pick the fastest available device
     if os.environ.get("FT_DEVICE"):
         device = os.environ["FT_DEVICE"]
