@@ -1,0 +1,21 @@
+{
+  "base_model": "BAAI/bge-small-en-v1.5",
+  "loss": "MultipleNegativesRankingLoss",
+  "epochs": 3,
+  "batch_size": 16,
+  "device": "mps",
+  "seed": 0,
+  "n_train_pairs": 48,
+  "n_eval_pairs": 40,
+  "eval_pool_size": 3000,
+  "before": {
+    "recall@5": 0.825,
+    "mrr@10": 0.7358333333333335
+  },
+  "after": {
+    "recall@5": 0.85,
+    "mrr@10": 0.7447916666666667
+  },
+  "recall@5_lift_pts": 2.5,
+  "mrr@10_lift_pts": 0.9
+}

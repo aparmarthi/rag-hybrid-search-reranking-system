@@ -4,6 +4,7 @@
   "epochs": 3,
   "batch_size": 16,
   "device": "mps",
+  "seed": 4,
   "n_train_pairs": 48,
   "n_eval_pairs": 40,
   "eval_pool_size": 3000,
@@ -13,8 +14,8 @@
   },
   "after": {
     "recall@5": 0.875,
-    "mrr@10": 0.745625
+    "mrr@10": 0.7619047619047619
   },
   "recall@5_lift_pts": 5.0,
-  "mrr@10_lift_pts": 1.0
+  "mrr@10_lift_pts": 2.6
 }

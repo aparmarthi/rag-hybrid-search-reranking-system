@@ -123,9 +123,10 @@ def main() -> None:
     )
     ap.add_argument(
         "--out",
-        default=str(REPO_ROOT / "evals" / "results" / "finetune.json"),
-        help="write config + before/after metrics here (committed, reproducible)",
+        default=None,
+        help="metrics JSON path (default: evals/results/finetune_seeds/seed_<seed>.json)",
     )
+    ap.add_argument("--seed", type=int, default=0, help="training seed (eval pool stays fixed)")
     args = ap.parse_args()
 
     run = None
@@ -134,6 +135,7 @@ def main() -> None:
 
         run = wandb.init(
             project="finsight-biencoder-finetune",
+            name=f"seed-{args.seed}",
             config={
                 "base_model": args.base_model,
                 "epochs": args.epochs,
@@ -141,6 +143,7 @@ def main() -> None:
                 "pool_size": args.pool_size,
                 "loss": "MultipleNegativesRankingLoss",
                 "train_pairs": args.train_pairs or "golden (self-split)",
+                "seed": args.seed,
             },
         )
 
@@ -172,6 +175,7 @@ def main() -> None:
     else:
         device = "cpu"
     print(f"Device: {device} (torch threads={torch.get_num_threads()})")
+    torch.manual_seed(args.seed)  # seeds the training shuffle; eval pool uses SEED above
     model = SentenceTransformer(args.base_model, device=device)
 
     before = evaluate(model, eval_pairs, pool)
@@ -210,6 +214,7 @@ def main() -> None:
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "device": device,
+        "seed": args.seed,
         "n_train_pairs": len(train_pairs),
         "n_eval_pairs": len(eval_pairs),
         "eval_pool_size": len(pool),
@@ -218,7 +223,7 @@ def main() -> None:
         "recall@5_lift_pts": round((after["recall@5"] - before["recall@5"]) * 100, 1),
         "mrr@10_lift_pts": round((after["mrr@10"] - before["mrr@10"]) * 100, 1),
     }
-    out_path = Path(args.out)
+    out_path = Path(args.out) if args.out else REPO_ROOT / "evals" / "results" / "finetune_seeds" / f"seed_{args.seed}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(results, indent=2))
     print(f"Wrote metrics -> {out_path}")

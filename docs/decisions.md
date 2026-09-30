@@ -605,7 +605,9 @@ Promoted the Phase-6 "stretch" two-tower bi-encoder fine-tune (spec v2.3 "next d
 - **Weave tracing** (`src/observability/weave_setup.py` + `@op` on all 6 graph nodes): the same retrieve→rerank→generate spans as LangSmith, re-expressed in Weave; off unless `WEAVE_ENABLED`.
 
 ### Result (honest)
-Trained bge-small on **48** Gemini-generated in-domain pairs, evaluated on **40 held-out golden queries** against a **3000-chunk** pool: **Recall@5 0.825 → 0.875 (+5.0 pts)**, **MRR@10 0.736 → 0.746 (+1.0 pts)**. Modest training set → modest-but-real lift. Numbers committed to `evals/results/finetune.json`.
+Trained bge-small on **48** Gemini-generated in-domain pairs, evaluated on **40 held-out golden queries** against a **3000-chunk** pool: **Recall@5 0.825 → 0.870 (+4.5 pts mean, range +2.5 to +5.0)**, **MRR@10 +1.4 pts mean (range +0.9 to +2.6)**, across **5 training seeds, positive on all 5**. Modest training set → modest-but-consistent lift. Per-seed results in `evals/results/finetune_seeds/`, each run logged to W&B (`ameyparmarthi-finsight/finsight-biencoder-finetune`).
+
+**Second debugging beat — seed variance:** an early re-run of the identical config gave +2.5 instead of +5.0. Cause: the training shuffle was unseeded. At n=40, one query = 2.5 pts, so a single run's lift is within noise. Fix: seed torch (verified — same seed reproduces exactly), run 5 seeds, report mean + range instead of one number.
 
 **The debugging story:** the first run used a 300-chunk eval pool and showed the base model already at **Recall@5 = 1.000** — a ceiling that made any "lift" meaningless. Diagnosed it as an eval that was too easy (small pool + generation-bias) *and* a training set of only 32 self-split pairs. Fixed both: a realistic 3000-chunk pool and a leakage-free expanded training set evaluated on the full golden set.
 
@@ -613,14 +615,14 @@ Trained bge-small on **48** Gemini-generated in-domain pairs, evaluated on **40 
 Framing the marginal first result (+0.0 Recall) as "fine-tuning didn't help — here's why" (a mature but weak demo). Rejected: the honest problem was eval design and training-set size, both fixable, so fixing them beat rationalizing a null result.
 
 ### Interview framing
-> "I fine-tuned a bi-encoder retriever with an in-batch-negative contrastive loss on domain pairs, then measured it honestly on a held-out set against a realistic corpus pool — Recall@5 went 82.5%→87.5%. The interesting part was the *first* run: base model was at Recall ceiling because my eval pool was too small, which taught me the eval was the bug, not the model. Small training set (48 pairs), so the lift is modest but real and measured, not asserted. Next step is scaling the pairs and running it on an actual GPU."
+> "I fine-tuned a bi-encoder retriever with an in-batch-negative contrastive loss on domain pairs, then measured it honestly on a held-out set against a realistic corpus pool — Recall@5 up 4.5 points on average across 5 seeds, positive on every seed. I report mean and range because at 40 eval queries one query is 2.5 points — a single run would be noise. The interesting part was the *first* run: base model was at Recall ceiling because my eval pool was too small, which taught me the eval was the bug, not the model. Small training set (48 pairs), so the lift is modest but real and measured, not asserted. Next step is scaling the pairs and running it on an actual GPU."
 
 ### Trade-offs
 - **Gain:** a genuine PyTorch training + Weave-observability artifact for the CoreWeave/MLE band; an honest eval-design war story.
 - **Lose:** small training set (Gemini free-tier rate limits capped generation at 48 pairs); ran on Apple MPS, not a real GPU — so no throughput/profiling story yet.
 
 ### Revisit trigger
-Before leaning on this as a headline: scale to 500+ training pairs and re-run on a real GPU (CoreWeave/Colab) to add a training-throughput + Recall-curve story. Sync the W&B runs online (currently offline) so the dashboard is demoable.
+Before leaning on this as a headline: scale to 500+ training pairs and re-run on a real GPU (CoreWeave/Colab) to add a training-throughput + Recall-curve story. W&B runs are synced online and demoable.
 
 ---
 
