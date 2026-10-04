@@ -17,7 +17,8 @@ import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
-from fastapi import FastAPI
+import anthropic
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -28,6 +29,12 @@ from src.utils.config import settings
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
+
+_LLM_UNAVAILABLE = (
+    "Answer generation is temporarily unavailable (LLM provider error). "
+    "Retrieval is healthy — please retry shortly."
+)
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
@@ -143,7 +150,11 @@ def query(req: QueryRequest) -> QueryResponse:
     from src.retrieval.graph import run_pipeline
 
     start = time.perf_counter()
-    state = run_pipeline(req.question, top_k=req.top_k)
+    try:
+        state = run_pipeline(req.question, top_k=req.top_k)
+    except anthropic.APIError as e:  # credit, auth, rate-limit, outage → 503, not a bare 500
+        log.error("LLM provider error on /query: %s", type(e).__name__)
+        raise HTTPException(status_code=503, detail=_LLM_UNAVAILABLE) from e
     chunks = state.get("reranked", [])
 
     latency_ms = int((time.perf_counter() - start) * 1000)
@@ -243,7 +254,15 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
                 }
                 yield f"event: done\ndata: {json.dumps(payload)}\n\n"
 
-    return StreamingResponse(events(), media_type="text/event-stream")
+    def safe_events():
+        # Headers are already sent mid-stream, so surface provider errors as an SSE event.
+        try:
+            yield from events()
+        except anthropic.APIError as e:
+            log.error("LLM provider error on /query/stream: %s", type(e).__name__)
+            yield f"event: error\ndata: {json.dumps({'detail': _LLM_UNAVAILABLE})}\n\n"
+
+    return StreamingResponse(safe_events(), media_type="text/event-stream")
 
 
 # ----- Related tickers (recommendation layer — shared embedding infra, no LLM) -----

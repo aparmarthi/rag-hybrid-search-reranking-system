@@ -31,6 +31,16 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Claude via OpenRouter's Anthropic-compatible endpoint (DEC-018).
+      # Set LLM_GATEWAY=anthropic + bare model ids to go direct again.
+      - key: LLM_GATEWAY
+        value: openrouter
+      - key: ANTHROPIC_PRIMARY_MODEL
+        value: anthropic/claude-sonnet-4.6
+      - key: ANTHROPIC_ROUTER_MODEL
+        value: anthropic/claude-haiku-4.5
+      - key: OPENROUTER_API_KEY
+        sync: false
       - key: VOYAGE_API_KEY
         sync: false
       - key: COHERE_API_KEY

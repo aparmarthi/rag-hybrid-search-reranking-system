@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # ----- LLM APIs -----
     anthropic_api_key: SecretStr = Field(..., description="Anthropic Claude API key")
     openai_api_key: SecretStr | None = Field(None, description="OpenAI key — Week 3 eval only")
+    openrouter_api_key: SecretStr | None = Field(None, description="OpenRouter key — used when llm_gateway='openrouter'")
+
+    # Gateway for every Claude call: "anthropic" (direct) or "openrouter" (same Anthropic
+    # Messages API via OpenRouter's Anthropic-compatible endpoint). DEC-018.
+    llm_gateway: str = Field("anthropic")
 
     # ----- Embeddings -----
     voyage_api_key: SecretStr = Field(..., description="Voyage AI for voyage-finance-2 embeddings")

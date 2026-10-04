@@ -88,3 +88,56 @@ def test_feedback_rejects_bad_rating():
     client = TestClient(app)
     r = client.post("/feedback", json={"question": "q", "rating": 5})  # out of [-1,1]
     assert r.status_code == 422  # pydantic validation
+
+
+# ---- LLM gateway + graceful degradation (DEC-018) ----
+def _provider_error():
+    import anthropic
+    import httpx
+    return anthropic.APIConnectionError(request=httpx.Request("POST", "https://example.invalid"))
+
+
+def test_cost_prices_openrouter_model_ids():
+    from src.utils.cost_tracker import estimate_cost
+    assert estimate_cost("anthropic/claude-sonnet-4.6", 1_000_000, 0) == 3.0
+    assert estimate_cost("anthropic/claude-haiku-4.5", 1_000_000, 0) == 1.0
+
+
+def test_openrouter_gateway_requires_key(monkeypatch):
+    import pytest
+
+    from src.utils import llm_client
+    monkeypatch.setattr(llm_client.settings, "llm_gateway", "openrouter")
+    monkeypatch.setattr(llm_client.settings, "openrouter_api_key", None)
+    llm_client.anthropic_client.cache_clear()
+    with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
+        llm_client.anthropic_client()
+    llm_client.anthropic_client.cache_clear()
+
+
+def test_query_returns_503_on_llm_provider_error(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import src.retrieval.graph as graph
+    from api.main import app
+
+    def boom(*args, **kwargs):
+        raise _provider_error()
+    monkeypatch.setattr(graph, "run_pipeline", boom)
+    r = TestClient(app).post("/query", json={"question": "What did Apple say?"})
+    assert r.status_code == 503
+    assert "temporarily unavailable" in r.json()["detail"]
+
+
+def test_stream_emits_error_event_on_llm_provider_error(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import src.retrieval.nodes as nodes
+    from api.main import app
+
+    def boom(state):
+        raise _provider_error()
+    monkeypatch.setattr(nodes, "query_understanding", boom)
+    r = TestClient(app).post("/query/stream", json={"question": "What did Apple say?"})
+    assert r.status_code == 200
+    assert "event: error" in r.text

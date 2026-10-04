@@ -44,4 +44,4 @@ jobs:
       - name: Serve-import guard (requirements-serve.txt drift)
         run: python -m scripts.check_serve_imports
       - name: Unit tests
-        run: python -m pytest tests/test_unit.py
+        run: python -m pytest tests/test_unit.py tests/test_week4.py

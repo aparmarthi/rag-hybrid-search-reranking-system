@@ -23,7 +23,7 @@ In a regulated environment (SEC Rule 10b-5 liability on any numeric claim), a co
 
 - **Analyst value:** ~3 hrs/day saved × $200/hr × 20 days ≈ **$12K/month** of analyst time per seat.
 - **Pricing:** $500/mo per seat (≈2.5% of a Bloomberg Terminal) → **~24× ROI** at the point of sale.
-- **Unit economics:** ~$0.005/query × 50 queries/day × 20 days ≈ **$5/month cost** → **~99% gross margin**.
+- **Unit economics:** ~$0.014/query (measured, see below) × 50 queries/day × 20 days ≈ **$14/month cost** → **~97% gross margin**.
 
 Full model and ICP in [docs/PRD.md](docs/PRD.md) §10.
 
@@ -63,8 +63,9 @@ Full architecture diagram in `docs/architecture.md`.
 | Fallback reranker | ms-marco-MiniLM-L-6-v2 | Local cross-encoder for Cohere-outage degradation |
 | Orchestration | LangGraph | Stateful 6-node DAG with conditional branching; per-node LangSmith tracing |
 | Primary LLM | Claude Sonnet 4.6 | Best citation-format enforcement; structured tool use |
+| LLM gateway | Anthropic direct *or* OpenRouter | One config switch (`LLM_GATEWAY`); both speak the Anthropic Messages API, so tool use + streaming are identical (DEC-018) |
 | Router LLM | Claude Haiku 4.5 | 10× cheaper for 3-class intent classification (earnings / metrics / risk_and_events) |
-| Prompt caching | Anthropic | ~60–80% cost reduction on static system prompt + tool defs |
+| Prompt caching | Anthropic `cache_control` | Wired on the system prompt; inactive today — prompt is below the 1,024-token cache minimum (DEC-018) |
 | Structured outputs | Claude tool use + Pydantic | Citations and conflicts are schema-validated, not regex-parsed |
 | Structured store | DuckDB | Columnar, 10–50× faster than Postgres/SQLite for OHLCV + fundamentals |
 | Evals | RAGAS + 10 pytest assertions | Industry standard faithfulness + context precision; CI-gateable |
@@ -104,7 +105,7 @@ Reproduce: `python -m src.evaluation.ablation` / `ragas_runner` / `chunking_abla
 | Faithfulness (RAGAS) | ≥ 0.80 | **0.806** ✅ (n=40, Claude judge + Voyage embeddings) |
 | NDCG@10 lift, hybrid+rerank vs dense | ≥ 10% | **+27.4%** ✅ |
 | P95 latency | ≤ 3s | *Week 4 load test* |
-| Cost per query | ≤ $0.005 | *Week 4* |
+| Cost per query | ≤ $0.005 | **$0.0135** ❌ mean (n=5 live, range $0.012–0.015) — ~3.2K tokens of retrieved evidence to Sonnet is the floor; see DEC-018 |
 
 ### Ablation 1 — Retrieval (headline: hybrid+rerank vs dense)
 
@@ -152,7 +153,7 @@ Deferred to complete the eval block; not yet run.*
 ### Prerequisites
 - Python 3.11+
 - Docker Desktop
-- API keys: Anthropic, Voyage, Cohere, LangSmith (free tiers work for dev)
+- API keys: Anthropic *or* OpenRouter (`LLM_GATEWAY=openrouter`), Voyage, Cohere, LangSmith (free tiers work for dev)
 - Qdrant Cloud account (free 1GB tier) — only needed for public deploy
 
 ### Setup
@@ -251,10 +252,12 @@ verify the trimmed runtime has every dependency the serve path imports:
 python -m scripts.check_serve_imports   # guards against requirements-serve.txt drift
 ```
 
-### Run evals *(Week 3 — not yet implemented)*
+### Run evals
 ```bash
-python -m src.evaluation.ragas_runner --golden evals/golden_queries.jsonl
-python -m src.evaluation.ablation --config evals/ablation_configs/retrieval.yaml
+python -m src.evaluation.ablation          # retrieval ablation (dense vs hybrid vs hybrid+rerank)
+python -m src.evaluation.ragas_runner      # RAGAS faithfulness vs the 0.80 gate
+python -m src.evaluation.chunking_ablation --max-docs 60
+# ablation / ragas_runner accept --limit N for a quick pass
 ```
 
 ---
@@ -281,7 +284,7 @@ finsight/
 ├── docs/
 │   ├── PRD.md               # Problem, users, metrics, trade-offs, ROI
 │   ├── architecture.md      # Diagrams, state schema, module boundaries (✅/🔷 marked)
-│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…013)
+│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…018)
 │   ├── deployment-playbook.md   # How I'd deploy this at a regulated customer (FDE artifact)
 │   ├── interview-positioning.md # Role → question → artifact map
 │   └── finsight_spec_v2.3.md  # Canonical spec

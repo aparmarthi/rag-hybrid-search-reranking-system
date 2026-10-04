@@ -50,6 +50,9 @@ def stream_query(question: str, top_k: int, answer_box) -> dict | None:
                         answer_box.markdown(text + "▌")
                     elif event == "done":
                         done = payload
+                    elif event == "error":
+                        answer_box.warning(payload["detail"])
+                        return None
     except Exception as e:  # noqa: BLE001
         answer_box.error(f"Query failed: {e}")
         return None

@@ -37,7 +37,8 @@ RETRIEVAL_SURCHARGE_USD = 0.0004  # voyage embed + cohere rerank, per query (app
 
 def estimate_cost(model: str, input_tokens: int, output_tokens: int, cache_read_tokens: int = 0) -> float:
     """USD cost for one LLM call. Cache reads are billed at ~10% of input price."""
-    p = PRICES.get(model)
+    # OpenRouter ids ("anthropic/claude-sonnet-4.6") map to the same Anthropic prices.
+    p = PRICES.get(model) or PRICES.get(model.removeprefix("anthropic/").replace(".", "-"))
     if not p:
         return 0.0
     billed_in = max(0, input_tokens - cache_read_tokens)

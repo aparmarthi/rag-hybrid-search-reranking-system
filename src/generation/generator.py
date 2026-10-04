@@ -34,13 +34,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Iterator
-
-import anthropic
 
 from src.retrieval.retriever import RetrievedChunk
 from src.utils.config import settings
+from src.utils.llm_client import anthropic_client
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -78,23 +76,6 @@ class GeneratedAnswer:
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
-
-
-@lru_cache(maxsize=1)
-def _client() -> anthropic.Anthropic:
-    # Pin to Anthropic's public API. Ignore any ambient ANTHROPIC_BASE_URL
-    # (e.g. a corporate model-gateway proxy) so this personal project always
-    # talks directly to Anthropic with the .env key. Use certifi's CA bundle
-    # so TLS verifies regardless of the shell's SSL_CERT_FILE (Homebrew Python
-    # ships without a system trust store). See DEC-010.
-    import certifi
-    import httpx
-
-    return anthropic.Anthropic(
-        api_key=settings.anthropic_api_key.get_secret_value(),
-        base_url="https://api.anthropic.com",
-        http_client=httpx.Client(verify=certifi.where()),
-    )
 
 
 def _format_evidence(chunks: list[RetrievedChunk]) -> str:
@@ -147,7 +128,7 @@ class Generator:
     """Claude Sonnet generation with inline [N] citations + streaming support."""
 
     def __init__(self) -> None:
-        self._client = _client()
+        self._client = anthropic_client()
         self._model = settings.anthropic_primary_model
 
     def generate(self, query: str, chunks: list[RetrievedChunk]) -> GeneratedAnswer:

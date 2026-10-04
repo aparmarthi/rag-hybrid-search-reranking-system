@@ -20,29 +20,16 @@ from __future__ import annotations
 import time
 from functools import lru_cache
 
-import anthropic
-
 from src.generation.generator import Generator
 from src.observability.weave_setup import op
 from src.retrieval.graph_state import FinSightState
 from src.retrieval.reranker import Reranker
 from src.retrieval.retriever import Retriever
 from src.utils.config import settings
+from src.utils.llm_client import anthropic_client
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
-
-
-@lru_cache(maxsize=1)
-def _haiku() -> anthropic.Anthropic:
-    import certifi
-    import httpx
-
-    return anthropic.Anthropic(
-        api_key=settings.anthropic_api_key.get_secret_value(),
-        base_url="https://api.anthropic.com",
-        http_client=httpx.Client(verify=certifi.where()),
-    )
 
 
 @lru_cache(maxsize=1)
@@ -111,7 +98,7 @@ def query_understanding(state: FinSightState) -> dict:
     q = state["raw_query"]
     temporal = None
     try:
-        resp = _haiku().messages.create(
+        resp = anthropic_client().messages.create(
             model=settings.anthropic_router_model,
             max_tokens=300,
             tools=[_QU_TOOL],
@@ -170,7 +157,7 @@ def router(state: FinSightState) -> dict:
     q = state.get("rewritten_query") or state["raw_query"]
     path = "earnings_analysis"  # safe default (the primary corpus)
     try:
-        resp = _haiku().messages.create(
+        resp = anthropic_client().messages.create(
             model=settings.anthropic_router_model,
             max_tokens=100,
             tools=[_ROUTER_TOOL],

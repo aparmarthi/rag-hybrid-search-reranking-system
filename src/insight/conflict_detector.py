@@ -27,12 +27,10 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
-
-import anthropic
 
 from src.retrieval.retriever import RetrievedChunk
 from src.utils.config import settings
+from src.utils.llm_client import anthropic_client
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -115,23 +113,11 @@ _EXTRACT_TOOL = {
 }
 
 
-@lru_cache(maxsize=1)
-def _client() -> anthropic.Anthropic:
-    import certifi
-    import httpx
-
-    return anthropic.Anthropic(
-        api_key=settings.anthropic_api_key.get_secret_value(),
-        base_url="https://api.anthropic.com",
-        http_client=httpx.Client(verify=certifi.where()),
-    )
-
-
 class ConflictDetector:
     """Extract numeric claims from evidence and flag contradictory pairs."""
 
     def __init__(self) -> None:
-        self._client = _client()
+        self._client = anthropic_client()
         self._model = settings.anthropic_primary_model
 
     def detect(self, chunks: list[RetrievedChunk]) -> list[Conflict]:

@@ -341,6 +341,8 @@ Option C.
 ### Revisit trigger
 If Anthropic access is ever unavailable for a live demo, the documented fallback is OpenRouter for generation (accepting the loss of native caching/tool-use) — a graceful-degradation story, not the default.
 
+> **Triggered 2026-10-04 → DEC-018.** It turned out to be cheaper than expected: OpenRouter's *Anthropic-compatible* endpoint keeps the native SDK, tool use and `cache_control`, so nothing was lost.
+
 ---
 
 ## DEC-016: Week-4 production layer + what was deliberately scoped out
@@ -623,6 +625,64 @@ Framing the marginal first result (+0.0 Recall) as "fine-tuning didn't help — 
 
 ### Revisit trigger
 Before leaning on this as a headline: scale to 500+ training pairs and re-run on a real GPU (CoreWeave/Colab) to add a training-throughput + Recall-curve story. W&B runs are synced online and demoable.
+
+---
+
+## DEC-018: Claude via OpenRouter's Anthropic-compatible endpoint — gateway as a config switch
+**Date:** 2026-10-04 (making the live demo self-sustaining)
+**Supersedes:** DEC-010's rationale #1 (for the generation core).
+
+### Context
+The live Render demo returned a 500 on `/query`: the personal Anthropic key was back at $0 credit. Remaining credit: OpenRouter ($10), GCP/Vertex Gemini. The demo had to work again without a new top-up, and a provider outage should never surface as an opaque 500.
+
+### Options considered
+A. **Gemini (Vertex) for the core** — largest runway. But it means rewriting 4 call sites (forced tool use, streaming, citation parsing), and every measured number (RAGAS 0.806, the ablations) was produced with Claude. Swapping the generator invalidates the evals the demo is built on.
+B. **OpenRouter via its OpenAI-compatible API** — the path DEC-010 rejected: different request shape, so `cache_control` and Anthropic tool use don't translate cleanly.
+C. **OpenRouter via its Anthropic-compatible Messages endpoint** (`https://openrouter.ai/api`) — the same `anthropic` SDK, with only `base_url`, key and model ids changing.
+
+### Decision
+Option C, as a config switch rather than a second code path.
+- `src/utils/llm_client.py`: one shared `anthropic_client()` for all serving call sites (generator, query-understanding/router nodes, conflict detector). `LLM_GATEWAY=anthropic|openrouter` picks the pinned base URL and key. The corporate-proxy guard from DEC-010 still holds, because `base_url` is never taken from the environment.
+- Model ids are env-configured (`anthropic/claude-sonnet-4.6`, `anthropic/claude-haiku-4.5` on OpenRouter). The cost tracker maps them to the same price table, since OpenRouter passes through Anthropic list prices.
+- **Graceful degradation:**
+  - Any `anthropic.APIError` on `/query` now returns a **503** that says retrieval is healthy and to retry.
+  - `/query/stream` emits an SSE `event: error`, which the Streamlit UI renders as a warning instead of hanging.
+  - Tests cover both cases.
+
+### Verified (live, before committing)
+- Haiku forced tool use returned a schema-valid route.
+- Sonnet streaming put the first token out at 0.9s.
+- The full pipeline on Qdrant Cloud ran 5/5 golden queries grounded, with citations.
+
+### What the measurement exposed
+Cost is **$0.0135/query mean (n=5, range $0.012–0.015)**, not the ~$0.005 the README claimed.
+- The floor is ~3.2K input tokens of retrieved evidence to Sonnet. That alone is ~$0.0096.
+- The tracked figure covers Sonnet plus retrieval. The two Haiku nodes add about $0.002 that the tracker doesn't count yet, so true cost is about $0.015.
+- `cache_read_tokens` was 0 on every call. The static system prompt is ~300 tokens, below Sonnet's 1,024-token cache minimum, so `cache_control` is wired but never fires. The evidence block changes per query and can't be cached.
+- Docs are now corrected to the measured number.
+- Real levers, if cost mattered at scale:
+  - Top-5 → top-3 chunks, about -35% input.
+  - Haiku generation for simple metric lookups.
+  - Tighter chunking.
+
+### Interview framing
+> "My Anthropic credit ran out with the demo live, and `/query` started 500ing. I didn't port to Gemini, because that would have invalidated every eval number I'd measured with Claude. I moved the gateway to OpenRouter's Anthropic-compatible endpoint: same SDK, same tool use and streaming, one env var. I also made provider failures degrade to a 503 that says retrieval is fine. Re-measuring live showed my cost claim was off by ~3×: $0.0135, not $0.005. Prompt caching wasn't firing because the prompt was below the cache minimum. I corrected the docs rather than keep a number I couldn't reproduce."
+
+### Trade-offs
+- **Gain:**
+  - The demo runs on existing credit. $10 covers about 650 queries.
+  - Provider choice is a deploy-time flag.
+  - Outages degrade honestly.
+  - The cost numbers are now measured rather than assumed.
+- **Lose:**
+  - A third party sits in the request path, adding a little latency and another dependency.
+  - OpenRouter sees the prompts. That's acceptable for public filings, not for a regulated customer.
+  - The eval modules (`ablation`, `faithfulness`, `golden_set`) still build their own direct-Anthropic clients. They're offline tools, so they're left out of this change.
+
+### Revisit trigger
+- Direct Anthropic credit restored → flip `LLM_GATEWAY=anthropic` (bare model ids). No code change.
+- A regulated-customer deployment → direct or VPC-hosted provider only. No third-party gateway.
+- Repeated OpenRouter errors → add Gemini as a *secondary failover* behind the 503 path, never as the primary. That keeps the eval numbers valid.
 
 ---
 
