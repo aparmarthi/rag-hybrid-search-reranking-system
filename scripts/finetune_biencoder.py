@@ -127,6 +127,7 @@ def main() -> None:
         help="metrics JSON path (default: evals/results/finetune_seeds/seed_<seed>.json)",
     )
     ap.add_argument("--seed", type=int, default=0, help="training seed (eval pool stays fixed)")
+    ap.add_argument("--run-name", default=None, help="W&B run name (default: seed-<seed>)")
     args = ap.parse_args()
 
     run = None
@@ -135,7 +136,7 @@ def main() -> None:
 
         run = wandb.init(
             project="finsight-biencoder-finetune",
-            name=f"seed-{args.seed}",
+            name=args.run_name or f"seed-{args.seed}",
             config={
                 "base_model": args.base_model,
                 "epochs": args.epochs,

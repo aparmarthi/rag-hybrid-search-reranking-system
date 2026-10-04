@@ -40,6 +40,10 @@ _PROVIDERS = [
     ("OPENROUTER_API_KEY", "https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
     ("OPENAI_API_KEY", None, "gpt-4o-mini"),
     ("GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-2.5-flash"),
+    # Vertex AI bills to GCP credit; token = `gcloud auth print-access-token` (valid ~1h)
+    ("VERTEX_ACCESS_TOKEN",
+     "https://us-central1-aiplatform.googleapis.com/v1/projects/finsight-gpu/locations/us-central1/endpoints/openapi",
+     "google/gemini-2.5-flash"),
 ]
 
 _PROMPT = (
@@ -68,7 +72,7 @@ def _make_client(prefer: str | None = None) -> tuple[OpenAI, str]:
     if prefer:
         providers = [p for p in _PROVIDERS if prefer.lower() in p[0].lower()]
         if not providers:
-            raise SystemExit(f"Unknown provider '{prefer}'. Choose: openrouter, openai, gemini.")
+            raise SystemExit(f"Unknown provider '{prefer}'. Choose: openrouter, openai, gemini, vertex.")
     for env_key, base_url, model in providers:
         key = _env_or_dotenv(env_key)
         if key:
@@ -76,7 +80,7 @@ def _make_client(prefer: str | None = None) -> tuple[OpenAI, str]:
             print(f"Using {env_key} -> model {model}")
             return client, model
     raise SystemExit(
-        "No LLM key found. Export one of: OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY."
+        "No LLM key found. Export one of: OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, VERTEX_ACCESS_TOKEN."
     )
 
 
@@ -84,7 +88,10 @@ def _gen_query(client: OpenAI, model: str, chunk: dict) -> str | None:
     prompt = _PROMPT.format(meta=f"{chunk['ticker']} {chunk['date']}", text=chunk["text"][:1500])
     kwargs: dict = {"model": model, "max_tokens": 120, "temperature": 0.3,
                     "messages": [{"role": "user", "content": prompt}]}
-    if "gemini" in model:  # 3.x flash is a reasoning model; turn thinking off so output isn't truncated
+    # 2.5+ flash is a reasoning model; turn thinking off so output isn't truncated
+    if model.startswith("google/"):  # Vertex rejects reasoning_effort="none"
+        kwargs["extra_body"] = {"extra_body": {"google": {"thinking_config": {"thinking_budget": 0}}}}
+    elif "gemini" in model:
         kwargs["reasoning_effort"] = "none"
     for attempt in range(5):
         try:
@@ -135,7 +142,9 @@ def _sample_seed_chunks(n: int, exclude: set[str]) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=150, help="number of training pairs to generate")
-    ap.add_argument("--provider", default=None, help="force provider: openrouter | openai | gemini")
+    ap.add_argument("--provider", default=None, help="force provider: openrouter | openai | gemini | vertex")
+    ap.add_argument("--out", default=str(OUT_PATH), help="output jsonl path")
+    ap.add_argument("--sleep", type=float, default=6.0, help="seconds between calls (6s fits free-tier RPM)")
     args = ap.parse_args()
 
     client, model = _make_client(args.provider)
@@ -144,7 +153,7 @@ def main() -> None:
     print(f"Excluding {len(exclude)} golden seeds. Generating {len(seeds)} pairs...")
 
     written = 0
-    with open(OUT_PATH, "w") as f:
+    with open(args.out, "w") as f:
         for i, seed in enumerate(seeds, 1):
             q = _gen_query(client, model, seed)
             if not q:
@@ -154,9 +163,9 @@ def main() -> None:
             written += 1
             if i % 25 == 0:
                 print(f"  {i}/{len(seeds)} processed, {written} written")
-            time.sleep(6.0)  # ~10 RPM; sustained clean on gemini-2.5-flash for this key
+            time.sleep(args.sleep)
 
-    print(f"\nWrote {written} training pairs -> {OUT_PATH}")
+    print(f"\nWrote {written} training pairs -> {args.out}")
 
 
 if __name__ == "__main__":
