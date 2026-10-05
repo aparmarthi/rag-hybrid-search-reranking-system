@@ -219,6 +219,8 @@ data/interim/
 artifacts/*
 !artifacts/golden_set/
 !artifacts/ticker_universe.json
+# 313KB; committed so Render never rebuilds it from a full Qdrant scan on cold start
+!artifacts/ticker_centroids.npz
 mlruns/
 .mlflow/
 wandb/

@@ -42,7 +42,7 @@ def build_centroids() -> dict[str, np.ndarray]:
     while True:
         pts, offset = client.scroll(
             collection_name=COLLECTION_NAME, limit=1000, offset=offset,
-            with_payload=True, with_vectors=True,
+            with_payload=["ticker"], with_vectors=["dense"],  # skip chunk text: ~15K points
         )
         for p in pts:
             tk = (p.payload or {}).get("ticker")
