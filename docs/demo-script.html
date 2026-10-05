@@ -95,12 +95,13 @@
   <div class="turn user"><span class="who">You (Tab 1 · Ask)</span><span class="say">What did companies say about COVID-19 supply chain disruptions?</span></div>
   <div class="turn"><span class="who">FinSight</span><span class="say">Streams a synthesized answer with inline <span class="mono">[1] [2]</span> citations, a green <b>Grounded ✓</b> badge, the routing path, and expandable retrieved evidence.</span></div>
   <div class="expect"><b>Point out:</b> every factual claim carries an inline <span class="mono">[N]</span> citation parsed to a structured source — the answer is grounded in retrieved chunks, not the model's memory. Citations are parsed post-hoc, not forced tool-use, which is what keeps streaming fast (first token ~1.3s vs ~11s).</div>
-  <div class="watch"><b>Watch the sidebar:</b> API healthy · <b>15,023 chunks</b>, and the per-query metrics row (latency, output tokens, est. cost, conflicts). Alt query: <b>"Microsoft cloud revenue growth"</b>.</div>
+  <div class="watch"><b>Watch the sidebar:</b> API healthy · <b>15,023 chunks</b>, and the per-query metrics row (latency, output tokens, est. cost, conflicts). Alt query: <b>"Oracle cloud revenue growth"</b>.</div>
 
   <!-- Tab 2 -->
   <h3>2 · Conflict detector — the differentiator <span class="pill conflict">Sonnet · gated on intent</span></h3>
   <div class="turn user"><span class="who">You (Tab 2 · Conflict)</span><span class="say">Did company revenue guidance match actual results?</span></div>
   <div class="turn"><span class="who">FinSight</span><span class="say">Answers, then — when the evidence genuinely disagrees — surfaces an ⚠️ <b>Evidence conflict</b>: e.g. guided +15% vs delivered +9% on the same metric across two calls.</span></div>
+  <div class="watch"><b>Expect 0 conflicts live (checked 2026-10-05; 0 of 4 guidance queries fired).</b> Don't wait for the flag. Say it before you click: "The detector is precision-first, and standard retrieval rarely returns both a company's guidance and its later actual, so 'none found' is the usual result. The engine is proven on paired evidence: NVDA guided 15%, delivered 9%, fires; a different-segment control doesn't." That's the unit test <code>test_conflict_score_flags_genuine_divergence</code>. The fix is a conflict-aware retrieval mode (DEC-007 revisit trigger). This query also takes ~30–40s because of the extraction call, so run it while you talk.</div>
   <div class="expect"><b>Point out:</b> this is a <b>dedicated node with its own Sonnet extraction call</b>, not a line in the generation prompt. It pulls structured numeric claims, then pure-Python pairwise-compares them behind four precision gates (different-chunk, comparable-period, same-subject, different-date) that took a naive 6-false-positives-on-query-one down to 0.</div>
   <div class="watch"><b>Cost gate:</b> the ~14s extraction fires <b>only</b> on comparison/guidance intent (keywords: guidance, versus, revised, compare). Plain queries skip it entirely (0 ms). Other examples in the dropdown: "How did management revise its full-year outlook over the year?"</div>
 
@@ -113,7 +114,7 @@
 
   <!-- Tab 4 -->
   <h3>4 · Observability — every query is measured <span class="pill haiku">per-node trace</span></h3>
-  <div class="turn user"><span class="who">You (Tab 4 · Observability)</span><span class="say">Microsoft cloud revenue growth</span></div>
+  <div class="turn user"><span class="who">You (Tab 4 · Observability)</span><span class="say">Oracle cloud revenue growth</span></div>
   <div class="turn"><span class="who">FinSight</span><span class="say">Total latency, est. cost, routing path, failure-mode label, plus the per-node latency breakdown and token counts.</span></div>
   <div class="expect"><b>Point out:</b> the per-node latency makes the <b>cost-routing story</b> visible — cheap Haiku for understand + route, a single Sonnet call for synthesis. Cost lands at ~<span class="num">$0.015</span>/query (measured; most of it is ~3.2K tokens of evidence into Sonnet), and every query is tagged with a failure mode for regression tracking.</div>
   <div class="watch"><b>Honest note:</b> the "~55% cost saving" is a per-token <b>spec estimate</b>, not a measured A/B — the split is real in code, the exact % isn't benchmarked. Say that if probed.</div>

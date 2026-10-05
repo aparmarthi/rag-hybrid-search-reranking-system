@@ -39,7 +39,7 @@ def _cohere_client():
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
     import cohere
 
-    return cohere.ClientV2(api_key=settings.cohere_api_key.get_secret_value())
+    return cohere.ClientV2(api_key=settings.cohere_api_key.get_secret_value(), timeout=15)  # SDK default 300s
 
 
 @lru_cache(maxsize=1)

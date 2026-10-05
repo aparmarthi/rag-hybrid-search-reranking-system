@@ -649,6 +649,7 @@ Option C, as a config switch rather than a second code path.
   - `/query/stream` emits an SSE `event: error`, which the Streamlit UI renders as a warning instead of hanging.
   - A missing key (`LLMConfigError`) also returns a 503, and `/health` reports `llm_gateway` + `llm_key_configured`. The first Render deploy hit exactly this: the gateway var landed but the key didn't, and `/query` 500'd.
   - Tests cover all three cases.
+- **Explicit timeouts on every upstream client.** Demo rehearsal hit requests that never returned. The SDK defaults were the cause: Voyage `timeout=None` (hang forever), Cohere 300s, Claude 600s. Now Voyage is 30s with 2 retries, Cohere is 15s (it falls back to retrieval order), and Claude is 60s (the slowest real call is ~25s). A stuck dependency now becomes a fast 503 or a degraded answer instead of a hung request.
 - **Spend cap moved to the gateway.** `max_cost_per_query_usd` and `daily_api_budget_usd` were defined in config but enforced nowhere, so they're deleted. An in-process daily counter would reset on every Render free-tier spin-down. The hard cap is a spend limit on the OpenRouter key, where the state persists.
 
 ### Verified (live, before committing)

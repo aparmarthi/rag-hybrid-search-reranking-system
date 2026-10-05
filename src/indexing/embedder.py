@@ -52,7 +52,8 @@ class VoyageEmbedder:
         os.environ.setdefault("SSL_CERT_FILE", certifi.where())
         import voyageai
 
-        self._client = voyageai.Client(api_key=settings.voyage_api_key.get_secret_value())
+        # SDK default is timeout=None: one stalled socket hangs the request forever.
+        self._client = voyageai.Client(api_key=settings.voyage_api_key.get_secret_value(), timeout=30, max_retries=2)
         self._model = settings.voyage_model
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:

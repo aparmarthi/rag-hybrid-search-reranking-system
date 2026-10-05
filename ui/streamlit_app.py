@@ -137,6 +137,9 @@ with tab_conflict:
     ]
     cq = st.selectbox("Try a conflict-oriented query", examples)
     custom = st.text_input("…or your own (include words like 'guidance', 'versus', 'revised')")
+    st.caption("Precision-first: a flag needs the same company, metric and period, stated in two "
+               "different calls. Most result sets don't contain both halves of such a pair, so "
+               "'no conflicts' is the common, correct outcome (DEC-007).")
     query = custom.strip() or cq
     if st.button("Detect conflicts", type="primary", key="conflict"):
         st.markdown("### Answer")
@@ -170,7 +173,7 @@ with tab_recs:
 with tab_obs:
     st.markdown("**Every query is measured.** Run one to see per-query cost, latency, "
                 "the routing path, and the failure-mode classification.")
-    oq = st.text_input("Query to trace", placeholder="Microsoft cloud revenue growth",
+    oq = st.text_input("Query to trace", placeholder="Oracle cloud revenue growth",
                        key="obs_q")
     if st.button("Run + trace", type="primary", key="obs") and oq.strip():
         try:

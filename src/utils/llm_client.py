@@ -56,5 +56,6 @@ def anthropic_client() -> anthropic.Anthropic:
     return anthropic.Anthropic(
         api_key=key,
         base_url=_BASE_URLS[gateway],
+        timeout=60.0,  # SDK default is 600s; slowest real call (conflict extraction) is ~25s
         http_client=httpx.Client(verify=certifi.where()),
     )
