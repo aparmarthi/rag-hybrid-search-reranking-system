@@ -23,7 +23,7 @@ In a regulated environment (SEC Rule 10b-5 liability on any numeric claim), a co
 
 - **Analyst value:** ~3 hrs/day saved × $200/hr × 20 days ≈ **$12K/month** of analyst time per seat.
 - **Pricing:** $500/mo per seat (≈2.5% of a Bloomberg Terminal) → **~24× ROI** at the point of sale.
-- **Unit economics:** ~$0.014/query (measured, see below) × 50 queries/day × 20 days ≈ **$14/month cost** → **~97% gross margin**.
+- **Unit economics:** ~$0.015/query (measured, see below) × 50 queries/day × 20 days ≈ **$15/month cost** → **~97% gross margin**.
 
 Full model and ICP in [docs/PRD.md](docs/PRD.md) §10.
 
@@ -104,7 +104,7 @@ Reproduce: `python -m src.evaluation.ablation` / `ragas_runner` / `chunking_abla
 |---|---|---|
 | Faithfulness (RAGAS) | ≥ 0.80 | **0.806** ✅ (n=40, Claude judge + Voyage embeddings) |
 | NDCG@10 lift, hybrid+rerank vs dense | ≥ 10% | **+27.4%** ✅ |
-| P95 latency | ≤ 3s | *Week 4 load test* |
+| P95 latency | ≤ 3s | ❌ Live, single-user: **first token 4.3s**, full answer ~12–15s (conflict-check queries ~25–30s). No load test yet; every call costs money (DEC-018) |
 | Cost per query | ≤ $0.005 | **$0.0135** ❌ mean (n=5 live, range $0.012–0.015) — ~3.2K tokens of retrieved evidence to Sonnet is the floor; see DEC-018 |
 
 ### Ablation 1 — Retrieval (headline: hybrid+rerank vs dense)

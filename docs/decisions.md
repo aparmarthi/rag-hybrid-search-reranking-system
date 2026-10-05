@@ -647,7 +647,9 @@ Option C, as a config switch rather than a second code path.
 - **Graceful degradation:**
   - Any `anthropic.APIError` on `/query` now returns a **503** that says retrieval is healthy and to retry.
   - `/query/stream` emits an SSE `event: error`, which the Streamlit UI renders as a warning instead of hanging.
-  - Tests cover both cases.
+  - A missing key (`LLMConfigError`) also returns a 503, and `/health` reports `llm_gateway` + `llm_key_configured`. The first Render deploy hit exactly this: the gateway var landed but the key didn't, and `/query` 500'd.
+  - Tests cover all three cases.
+- **Spend cap moved to the gateway.** `max_cost_per_query_usd` and `daily_api_budget_usd` were defined in config but enforced nowhere, so they're deleted. An in-process daily counter would reset on every Render free-tier spin-down. The hard cap is a spend limit on the OpenRouter key, where the state persists.
 
 ### Verified (live, before committing)
 - Haiku forced tool use returned a schema-valid route.
@@ -659,7 +661,8 @@ Cost is **$0.0135/query mean (n=5, range $0.012–0.015)**, not the ~$0.005 the 
 - The floor is ~3.2K input tokens of retrieved evidence to Sonnet. That alone is ~$0.0096.
 - The tracked figure covers Sonnet plus retrieval. The two Haiku nodes add about $0.002 that the tracker doesn't count yet, so true cost is about $0.015.
 - `cache_read_tokens` was 0 on every call. The static system prompt is ~300 tokens, below Sonnet's 1,024-token cache minimum, so `cache_control` is wired but never fires. The evidence block changes per query and can't be cached.
-- Docs are now corrected to the measured number.
+- **Latency was also over target.** On the live deploy, first streamed token arrives at 4.3s and the full answer at ~12–15s, against a P95 ≤ 3s target. Conflict-check queries take ~25–30s. These are single-user numbers; no load test has been run.
+- Docs are now corrected to the measured numbers.
 - Real levers, if cost mattered at scale:
   - Top-5 → top-3 chunks, about -35% input.
   - Haiku generation for simple metric lookups.

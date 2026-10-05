@@ -115,7 +115,7 @@
   <h3>4 · Observability — every query is measured <span class="pill haiku">per-node trace</span></h3>
   <div class="turn user"><span class="who">You (Tab 4 · Observability)</span><span class="say">Microsoft cloud revenue growth</span></div>
   <div class="turn"><span class="who">FinSight</span><span class="say">Total latency, est. cost, routing path, failure-mode label, plus the per-node latency breakdown and token counts.</span></div>
-  <div class="expect"><b>Point out:</b> the per-node latency makes the <b>cost-routing story</b> visible — cheap Haiku for understand + route, a single Sonnet call for synthesis. Cost lands at ~<span class="num">$0.005</span>/query, and every query is tagged with a failure mode for regression tracking.</div>
+  <div class="expect"><b>Point out:</b> the per-node latency makes the <b>cost-routing story</b> visible — cheap Haiku for understand + route, a single Sonnet call for synthesis. Cost lands at ~<span class="num">$0.015</span>/query (measured; most of it is ~3.2K tokens of evidence into Sonnet), and every query is tagged with a failure mode for regression tracking.</div>
   <div class="watch"><b>Honest note:</b> the "~55% cost saving" is a per-token <b>spec estimate</b>, not a measured A/B — the split is real in code, the exact % isn't benchmarked. Say that if probed.</div>
 
   <!-- Tab 5 -->

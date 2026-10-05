@@ -90,10 +90,6 @@ class Settings(BaseSettings):
     # ----- DuckDB -----
     duckdb_path: Path = Field(default_factory=lambda: REPO_ROOT / "data" / "processed" / "finsight.duckdb")
 
-    # ----- Cost controls -----
-    max_cost_per_query_usd: float = Field(0.05, description="hard cap guardrail")
-    daily_api_budget_usd: float = Field(10.0, description="circuit breaker during dev")
-
     # ----- Paths (derived, not env-configurable) -----
     @property
     def repo_root(self) -> Path:

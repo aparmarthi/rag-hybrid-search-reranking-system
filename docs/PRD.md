@@ -75,7 +75,7 @@ Full 20-item DoD in `docs/finsight_spec_v2.3.md`.
 | Recency boost (+0.15 for last 2Q) | Pure relevance ranking | Financial data is time-sensitive; 2022 earnings are rarely relevant to 2024 questions |
 | Structured tool-use citations | Regex parsing | Claude-enforced Pydantic schemas are defensible in production; regex rots |
 | Haiku-then-Sonnet cost routing | Sonnet on every query | Intent classification is a 4-class problem — Haiku is 10× cheaper with < 100ms added latency |
-| Prompt caching | Fresh every call | 60–80% cost reduction on static system prompt + tool definitions; essential at $0.005/query target |
+| Prompt caching | Fresh every call | Wired, but inactive: the static prompt (~300 tokens) is below the 1,024-token cache minimum, and the evidence block changes per query (DEC-018) |
 | Qdrant | Pinecone / FAISS | Native hybrid BM25+dense in one index; free 1GB cloud tier; fastest metadata filtering |
 | 3-path router (earnings / metrics / risk_and_events) | Monolithic retrieval | Per-source Recall@K story is an interview artifact worth the complexity; OHLCV folded into Node 4, news path retired (decisions.md DEC-004) |
 | Evidence conflict detector | Answer-only RAG | Turns a Q&A tool into a product; the #1 interview moment |
@@ -134,7 +134,7 @@ Returns OHLCV event-window chart + news chunks from that window, explained.
 - **Pricing:** $500/mo per seat (2.5% of Bloomberg)
 - **ICP:** Small L/S hedge funds $100M–$1B AUM
 - **WTP:** 3 hrs/day saved × $200/hr × 20 days = $12K/month value → 24x ROI at $500
-- **Unit economics:** $0.005/query × 50 queries/day × 20 days = ~$5/month cost → ~99% gross margin
+- **Unit economics:** ~$0.015/query measured (target was $0.005; see DEC-018) × 50 queries/day × 20 days ≈ $15/month cost → ~97% gross margin
 - **Moat:** Fine-tuned domain encoder + query log data flywheel + eval harness IP
 
 Full version will live in `docs/product_strategy.md` (written in Week 5 as part of interview artifacts).

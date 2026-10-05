@@ -14,10 +14,22 @@ import httpx
 
 from src.utils.config import settings
 
+
+class LLMConfigError(ValueError):
+    """Gateway misconfigured (unknown gateway or missing key) — a deploy error, not a bug."""
+
+
 _BASE_URLS = {
     "anthropic": "https://api.anthropic.com",
     "openrouter": "https://openrouter.ai/api",  # Anthropic-compatible; SDK appends /v1/messages
 }
+
+
+def llm_key_configured() -> bool:
+    """True if the configured gateway has a key. Surfaced on /health."""
+    if settings.llm_gateway.lower() == "openrouter":
+        return settings.openrouter_api_key is not None
+    return True  # anthropic_api_key is required at settings load
 
 
 @lru_cache(maxsize=1)
@@ -29,14 +41,14 @@ def anthropic_client() -> anthropic.Anthropic:
     verification working under Homebrew Python, which ships without a system trust store.
 
     Raises:
-        ValueError: unknown gateway, or openrouter selected without OPENROUTER_API_KEY.
+        LLMConfigError: unknown gateway, or openrouter selected without OPENROUTER_API_KEY.
     """
     gateway = settings.llm_gateway.lower()
     if gateway not in _BASE_URLS:
-        raise ValueError(f"LLM_GATEWAY must be one of {sorted(_BASE_URLS)}, got '{gateway}'")
+        raise LLMConfigError(f"LLM_GATEWAY must be one of {sorted(_BASE_URLS)}, got '{gateway}'")
     if gateway == "openrouter":
         if settings.openrouter_api_key is None:
-            raise ValueError("LLM_GATEWAY=openrouter but OPENROUTER_API_KEY is not set")
+            raise LLMConfigError("LLM_GATEWAY=openrouter but OPENROUTER_API_KEY is not set")
         key = settings.openrouter_api_key.get_secret_value()
     else:
         key = settings.anthropic_api_key.get_secret_value()

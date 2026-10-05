@@ -110,7 +110,7 @@ def test_openrouter_gateway_requires_key(monkeypatch):
     monkeypatch.setattr(llm_client.settings, "llm_gateway", "openrouter")
     monkeypatch.setattr(llm_client.settings, "openrouter_api_key", None)
     llm_client.anthropic_client.cache_clear()
-    with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
+    with pytest.raises(llm_client.LLMConfigError, match="OPENROUTER_API_KEY"):
         llm_client.anthropic_client()
     llm_client.anthropic_client.cache_clear()
 
@@ -141,3 +141,29 @@ def test_stream_emits_error_event_on_llm_provider_error(monkeypatch):
     r = TestClient(app).post("/query/stream", json={"question": "What did Apple say?"})
     assert r.status_code == 200
     assert "event: error" in r.text
+
+
+def test_health_reports_missing_llm_key(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+    from src.utils import llm_client
+    monkeypatch.setattr(llm_client.settings, "llm_gateway", "openrouter")
+    monkeypatch.setattr(llm_client.settings, "openrouter_api_key", None)
+    body = TestClient(app).get("/health").json()
+    assert body["llm_gateway"] == "openrouter"
+    assert body["llm_key_configured"] is False
+    assert body["status"] == "degraded"
+
+
+def test_query_returns_503_on_missing_llm_key(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import src.retrieval.graph as graph
+    from api.main import app
+    from src.utils.llm_client import LLMConfigError
+
+    def boom(*args, **kwargs):
+        raise LLMConfigError("LLM_GATEWAY=openrouter but OPENROUTER_API_KEY is not set")
+    monkeypatch.setattr(graph, "run_pipeline", boom)
+    assert TestClient(app).post("/query", json={"question": "What did Apple say?"}).status_code == 503

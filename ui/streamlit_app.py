@@ -200,7 +200,7 @@ calls, filings, and market data under earnings-season time pressure.
 **The value:**
 - ~3 hrs/day saved cross-referencing sources → **~$12K/month** of analyst time per seat
 - Priced at **$500/mo** (≈2.5% of a Bloomberg Terminal) → **~24× ROI** at point of sale
-- Unit economics: ~$0.005/query × ~50 queries/day → **~99% gross margin**
+- Unit economics: ~$0.015/query (measured) × ~50 queries/day → **~97% gross margin**
 
 **Why the design choices matter to a regulated buyer (SEC Rule 10b-5):**
 a confident-but-wrong number is worse than a refusal — so the trust gates *are*

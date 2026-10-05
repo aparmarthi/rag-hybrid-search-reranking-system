@@ -26,6 +26,7 @@ from src.generation.generator import Generator
 from src.indexing.qdrant_client import collection_stats, get_client
 from src.retrieval.retriever import Retriever
 from src.utils.config import settings
+from src.utils.llm_client import LLMConfigError, llm_key_configured
 from src.utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -98,6 +99,8 @@ class HealthResponse(BaseModel):
     status: str
     qdrant_reachable: bool
     points_indexed: int | None
+    llm_gateway: str
+    llm_key_configured: bool
 
 
 # ----- Lazily-constructed singletons (avoid loading bge-m3 at import time) -----
@@ -129,18 +132,20 @@ def _retrieve_and_rerank(question: str, top_k: int):
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     """Liveness + dependency check."""
+    llm = {"llm_gateway": settings.llm_gateway, "llm_key_configured": llm_key_configured()}
     try:
         stats = collection_stats(get_client())
         reachable = "error" not in stats
         points = stats.get("points_count") if reachable else None
         return HealthResponse(
-            status="ok" if reachable else "degraded",
+            status="ok" if reachable and llm["llm_key_configured"] else "degraded",
             qdrant_reachable=reachable,
             points_indexed=points,
+            **llm,
         )
     except Exception as e:  # noqa: BLE001
         log.warning("Health check failed: %s", e)
-        return HealthResponse(status="degraded", qdrant_reachable=False, points_indexed=None)
+        return HealthResponse(status="degraded", qdrant_reachable=False, points_indexed=None, **llm)
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -152,7 +157,7 @@ def query(req: QueryRequest) -> QueryResponse:
     start = time.perf_counter()
     try:
         state = run_pipeline(req.question, top_k=req.top_k)
-    except anthropic.APIError as e:  # credit, auth, rate-limit, outage → 503, not a bare 500
+    except (anthropic.APIError, LLMConfigError) as e:  # credit, auth, outage, missing key → 503, not 500
         log.error("LLM provider error on /query: %s", type(e).__name__)
         raise HTTPException(status_code=503, detail=_LLM_UNAVAILABLE) from e
     chunks = state.get("reranked", [])
@@ -258,7 +263,7 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
         # Headers are already sent mid-stream, so surface provider errors as an SSE event.
         try:
             yield from events()
-        except anthropic.APIError as e:
+        except (anthropic.APIError, LLMConfigError) as e:
             log.error("LLM provider error on /query/stream: %s", type(e).__name__)
             yield f"event: error\ndata: {json.dumps({'detail': _LLM_UNAVAILABLE})}\n\n"
 
