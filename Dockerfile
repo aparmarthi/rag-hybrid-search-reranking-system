@@ -18,6 +18,8 @@ RUN pip install --upgrade pip && pip install -r requirements-serve.txt
 COPY src/ ./src/
 COPY api/ ./api/
 COPY ui/ ./ui/
+# ticker_centroids.npz: without it /recommend rebuilds from a full Qdrant scan per cold start
+COPY artifacts/ ./artifacts/
 
 RUN useradd --create-home --uid 1000 finsight && chown -R finsight:finsight /app
 USER finsight

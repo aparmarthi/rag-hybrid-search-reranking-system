@@ -1,0 +1,20 @@
+# Build context for `gcloud builds submit`. Secrets and data never leave the machine:
+# keys come from Secret Manager at runtime, vectors + text from Qdrant Cloud.
+.env
+.env.*
+.git/
+.venv/
+data/
+logs/
+wandb/
+mlruns/
+evals/
+notebooks/
+reports/
+docs/
+**/__pycache__/
+*.duckdb
+artifacts/finetuned-biencoder/
+qdrant_storage/
+tests/
+scripts/

@@ -4,8 +4,9 @@
 
 **Built to know what it doesn't know:** it refuses when it can't ground an answer, flags stale evidence, and surfaces contradictions between sources instead of confidently averaging them.
 
-**Live demo:** https://finsight-ui-z0mp.onrender.com — ask about 2019–2023 earnings calls; get a streamed, cited answer. *(Free-tier hosting: first request after ~15 min idle cold-starts ~50s, then fast.)*
-**API:** https://finsight-api-otsr.onrender.com/docs (FastAPI · `/query`, `/query/stream`, `/recommend`, `/feedback`, `/health`)
+**Live demo:** https://finsight-ui-995576020018.us-central1.run.app — ask about 2019–2023 earnings calls; get a streamed, cited answer. *(Google Cloud Run, always on — no cold start.)*
+**API:** https://finsight-api-995576020018.us-central1.run.app/docs (FastAPI · `/query`, `/query/stream`, `/recommend`, `/feedback`, `/health`)
+*Backup (Render free tier, ~50s cold start after idle):* [UI](https://finsight-ui-z0mp.onrender.com) · [API](https://finsight-api-otsr.onrender.com/docs)
 **Measured:** hybrid+rerank beats dense-only by **+27% NDCG@10**; RAGAS faithfulness **0.81** (n=40 golden set). See [Evaluation](#evaluation).
 **Status:** 🟩 Live · Weeks 1–4 complete (deploy → hybrid+rerank+LangGraph → conflict detector + evals → recs + observability). Week 5 = demo video + write-up.
 
@@ -72,7 +73,7 @@ Full architecture diagram in `docs/architecture.md`.
 | Observability | LangSmith + MLflow | Per-node traces + experiment tracking |
 | Serving | FastAPI (async) | Async handlers, Pydantic validation, connection pooling |
 | Demo UI | Streamlit | Free public URL, 5-tab multi-scenario |
-| Deployment | Render + Qdrant Cloud | Always-on live URL |
+| Deployment | Cloud Run (min-instances=1) + Secret Manager + Qdrant Cloud | Always-on live URL, no cold start (DEC-019) |
 | CI/CD | GitHub Actions | RAGAS gate on every PR — fails if faithfulness < 0.75 |
 
 ---
@@ -226,7 +227,7 @@ python -m scripts.add_sparse_vectors --cloud
 ```
 
 After steps 1–4 the full pipeline runs locally (hybrid retrieve → rerank →
-LangGraph → generate). Steps 5 is only needed to reproduce the live Render deploy.
+LangGraph → generate). Step 5 is only needed to reproduce the live deploy.
 
 ### Run locally
 ```bash
@@ -244,10 +245,20 @@ docker-compose up
 
 Open http://localhost:8501 for Streamlit, http://localhost:8000/docs for API.
 
-### Deploy (Render + Qdrant Cloud)
-The live demo runs from `render.yaml` (two services: `finsight-api`, `finsight-ui`).
-Secrets are set as Render dashboard env vars (never committed). Before deploying,
-verify the trimmed runtime has every dependency the serve path imports:
+### Deploy (Cloud Run + Qdrant Cloud)
+One image serves both services; the UI overrides the command to run Streamlit.
+Keys live in Secret Manager (`finsight-*`), readable only by the `finsight-run` service account.
+```bash
+gcloud builds submit --tag us-central1-docker.pkg.dev/finsight-gpu/finsight/finsight:$(git rev-parse --short HEAD)
+gcloud run deploy finsight-api --image <tag> --port 8000 --memory 1Gi --min-instances 1 \
+  --service-account finsight-run@finsight-gpu.iam.gserviceaccount.com \
+  --set-env-vars LLM_GATEWAY=openrouter,... --set-secrets OPENROUTER_API_KEY=finsight-openrouter-api-key:latest,...
+gcloud run deploy finsight-ui --image <tag> --port 8080 --min-instances 1 --session-affinity \
+  --command streamlit --args run,ui/streamlit_app.py,--server.port=8080,--server.address=0.0.0.0 \
+  --set-env-vars API_URL=<finsight-api url>
+```
+The Render backup still deploys from `render.yaml` with secrets as dashboard env vars.
+Before deploying, verify the trimmed runtime has every dependency the serve path imports:
 ```bash
 python -m scripts.check_serve_imports   # guards against requirements-serve.txt drift
 ```
@@ -284,7 +295,7 @@ finsight/
 ├── docs/
 │   ├── PRD.md               # Problem, users, metrics, trade-offs, ROI
 │   ├── architecture.md      # Diagrams, state schema, module boundaries (✅/🔷 marked)
-│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…018)
+│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…019)
 │   ├── deployment-playbook.md   # How I'd deploy this at a regulated customer (FDE artifact)
 │   ├── interview-positioning.md # Role → question → artifact map
 │   └── finsight_spec_v2.3.md  # Canonical spec

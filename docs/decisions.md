@@ -690,6 +690,46 @@ Cost is **$0.0135/query mean (n=5, range $0.012–0.015)**, not the ~$0.005 the 
 
 ---
 
+## DEC-019: Moved the live demo from Render free tier to Cloud Run, always on
+
+**Date:** 2026-10-05 · **Status:** Accepted
+
+### Context
+The demo is opened by hiring managers clicking a README link, usually cold. On the Render free tier each service sleeps after 15 min idle. Measured cold start was **~51s for the UI**, then the API cold-starts behind it. The first impression was a spinner. Render also gave no log access from the CLI, so a mid-rehearsal instance restart (possibly OOM at 512MB) couldn't be diagnosed.
+
+### Options considered
+A. **Stay on Render, upgrade to paid** ($7/service/month). Fixes sleep, but adds no GCP signal and still has no logs.
+B. **Keep Render free + a keep-alive pinger.** Free, but it fights the platform's ToS intent and still runs on ~0.1 vCPU.
+C. **Cloud Run, `min-instances=1` on both services**, funded by the Google One AI Pro GCP credit.
+
+### Decision
+Option C. Render stays up as a backup URL until the Loom is recorded.
+- **One image, two services.** The API image is built by Cloud Build and pushed to Artifact Registry (tag = git SHA). `finsight-ui` reuses it with the command overridden to Streamlit, so the UI and API can't drift.
+- **Secrets in Secret Manager**, mounted as env vars. They're readable only by a dedicated `finsight-run` service account, not the default compute SA (which now holds build permissions).
+- **Sizing:** API at 1 vCPU/1GiB (Render's 512MB was the suspected restart cause), UI at 1 vCPU/512MiB with session affinity (Streamlit holds a websocket per session). `max-instances=2` caps the blast radius of a traffic spike on LLM spend.
+- `.gcloudignore`/`.dockerignore` cut the build upload from 244MB to ~600KB (excludes `qdrant_storage/`, the 128MB fine-tuned bi-encoder, data, evals).
+
+### Verified (live)
+- `/health` 0.57s: Qdrant reachable, 15,023 points, `llm_key_configured=true`.
+- `/recommend/AAPL` 0.25s (shipped centroids).
+- The 4 demo-script queries match Render behavior: COVID grounded (16s), guidance grounded with 0 conflicts (38s), Oracle grounded (12s), Apple 2015 refuses (5.6s). Cost $0.011–0.016/query.
+- `/query/stream` emits tokens; the UI loads with "API healthy · 15,023 chunks".
+
+### Trade-offs
+- **Gain:** no cold start; real logs (`gcloud run services logs read`); 2× the memory; a GCP deploy story for the SA/FDE/CoreWeave conversations.
+- **Lose:** it's no longer free. Two always-on instances are an estimated ~$20–25/month at idle rates, so the $50 credit covers roughly two months of interview season. LLM spend is still capped separately on the OpenRouter key.
+- Latency is unchanged. The bottleneck is LLM generation, not hosting (DEC-018).
+
+### Interview framing
+> "The free tier was fine for building and wrong for the audience. A hiring manager clicking a link got a 50-second spinner. I paid for availability where it mattered: two always-on Cloud Run services from one image, secrets in Secret Manager under a least-privilege service account, and instance caps so a traffic spike can't run up the LLM bill."
+
+### Revisit trigger
+- Interview season ends → `--min-instances 0` (one command; cold start returns, cost goes to ~$0).
+- Credit runs low → drop the UI to min 0 first; the API is the expensive cold start.
+- Real traffic → load test before raising `max-instances`.
+
+---
+
 ## Format notes for future entries
 
 - Write these **as they happen**, not retroactively. Retroactive entries sound fake in interviews.
