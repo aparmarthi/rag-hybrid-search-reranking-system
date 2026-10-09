@@ -196,7 +196,7 @@ def query(req: QueryRequest) -> QueryResponse:
         chunks=[
             ChunkOut(
                 chunk_id=c.chunk_id,
-                text=c.text[:600],
+                text=c.text,
                 score=round(c.score, 4),
                 ticker=c.ticker,
                 doc_type=c.doc_type,
@@ -258,7 +258,7 @@ def query_stream(req: QueryRequest) -> StreamingResponse:
                     "chunks": [
                         {
                             "chunk_id": c.chunk_id, "ticker": c.ticker, "doc_type": c.doc_type,
-                            "date": c.date, "score": round(c.score, 4), "text": c.text[:600],
+                            "date": c.date, "score": round(c.score, 4), "text": c.text,
                         }
                         for c in chunks
                     ],
