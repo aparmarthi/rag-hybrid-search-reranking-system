@@ -13,12 +13,14 @@ Run:
 from __future__ import annotations
 
 import json
+import os
 import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
 import anthropic
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -54,6 +56,16 @@ app = FastAPI(
     description="Multi-source financial evidence engine — grounded, cited RAG.",
     version="0.1.0",
     lifespan=_lifespan,
+)
+
+# Browser front ends call this API cross-origin. No cookies/auth, so "*" is the default;
+# lock down via CORS_ALLOW_ORIGINS="https://a.com,https://b.com". LLM spend is capped by
+# max-instances + the OpenRouter key limit, not by CORS (curl ignores CORS anyway).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "*").split(","),
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 
