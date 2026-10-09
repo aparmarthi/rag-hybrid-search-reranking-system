@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements-serve.txt .
 RUN pip install --upgrade pip && pip install -r requirements-serve.txt
 
+# Bake the BM25 model into the image: runtime downloads from Cloud Run hit HuggingFace's
+# anonymous 429 rate limit, which crashed hybrid retrieval on fresh instances.
+ENV FASTEMBED_CACHE_PATH=/app/.cache/fastembed
+RUN python -c "from fastembed import SparseTextEmbedding; SparseTextEmbedding(model_name='Qdrant/bm25')"
+
 COPY src/ ./src/
 COPY api/ ./api/
 COPY ui/ ./ui/
