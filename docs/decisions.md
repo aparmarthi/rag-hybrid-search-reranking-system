@@ -544,6 +544,8 @@ C. **Inline [N] citations in streamed plain text, parsed post-hoc** — model wr
 ### Decision
 Option C. Stream plain text with inline [N] markers; parse them into structured citations from the completed text (`_parse_citations` in `generator.py`). Measured: **1.3s first token, ~8.5s total (warm)**.
 
+*Note (2026-10-15):* this is a Week-1 measurement, taken before the query-understanding, router, rerank and conflict nodes existed (DEC-013, Week 2). Those nodes all run before the first token. End-to-end TTFT on the live deploy is **4.3s** (DEC-018). The two numbers measure different paths; they don't contradict each other.
+
 ### Rationale
 1. **Both requirements met in one call** — sub-second first token AND structured, source-mapped citations. No second call, no cost penalty.
 2. **This is how production RAG does it** (Perplexity, Bing Copilot all use inline citation markers over streamed text) — a more defensible interview answer than a purpose-built tool.

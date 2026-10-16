@@ -14,7 +14,7 @@ export const DECISIONS: Decision[] = [
     id: 'DEC-011',
     title: 'Inline [N] citations over forced tool use',
     decision:
-      'Forced tool-use citations buffered the whole answer: 11.6 s to first token. Streaming plain text with inline [N] markers, parsed afterward, brought it to 1.3 s with the same source mapping.',
+      'Forced tool-use citations buffered the whole answer: 11.6 s to first token. Streaming plain text with inline [N] markers, parsed afterward, brought it to 1.3 s with the same source mapping (a Week 1 figure; live end-to-end TTFT through the full pipeline is 4.3 s).',
     tradeoff: 'Gives up schema-enforced citations for a streaming UX; mitigated by post-hoc parsing and validation.',
   },
   {
