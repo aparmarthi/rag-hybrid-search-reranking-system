@@ -14,7 +14,7 @@ what's actually built; planned nodes are marked so it stays honest to a reviewer
 flowchart TB
     FE[React frontend ✅<br/>frontend/ · browser, CORS] --> API[FastAPI ✅<br/>Cloud Run finsight-api]
     ST[Streamlit ✅<br/>Cloud Run finsight-ui] --> API
-    FE -.optional telemetry, insert-only.-> TD[(Bolt Database ✅<br/>query_events · client_errors)]
+    API -.telemetry + feedback, rate-limited.-> TD[(Neon Postgres ✅<br/>query_events · client_errors · feedback)]
     API --> U[User Query]
     U --> N1[Node 1 ✅<br/>Query Understanding — Haiku<br/>rewrite + ticker + temporal ref]
     N1 --> N2[Node 2 ✅<br/>Router — Haiku, 3-path]
@@ -164,9 +164,10 @@ Builder), `faithfulness_score`, `guardrail_flags` (inline guardrails).
 | `src/recommendations/` | Shared-embedding related tickers | `related_tickers.py` | ✅ |
 | `src/evaluation/` | Golden set + ablations + RAGAS + faithfulness judge | `golden_set.py`, `ablation.py`, `ragas_runner.py`, `chunking_ablation.py`, `faithfulness.py`, `llm_compare.py` | ✅ |
 | `src/utils/` | Config, logging, cost + failure trackers | `config.py`, `logging.py`, `cost_tracker.py`, `failure_tracker.py` | ✅ |
-| `api/` | FastAPI async serving | `main.py` (`/health`, `/query`, `/query/stream`, `/recommend`, `/feedback`) | ✅ |
+| `api/` | FastAPI async serving | `main.py` (`/health`, `/query`, `/query/stream`, `/recommend`, `/feedback`), `telemetry.py` (`/telemetry/*`, DEC-024) | ✅ |
+| `src/telemetry/` | Postgres store for telemetry + feedback | `schema.sql`, `store.py` (psycopg, Neon pooled URL) | ✅ |
 | `ui/` | Streamlit 5-tab demo | `streamlit_app.py` | ✅ |
-| `frontend/` | React + Vite evidence UI (Ask · Architecture · Evaluation), live eval suite, client telemetry | `src/lib/api.ts` (SSE client), `evidence.ts` (citations, DEC-020), `eval-suite.ts` (DEC-022), `telemetry.ts` (DEC-023), `supabase/migrations/` | ✅ |
+| `frontend/` | React + Vite evidence UI (Ask · Architecture · Evaluation), live eval suite, client telemetry | `src/lib/api.ts` (SSE client), `evidence.ts` (citations, DEC-020), `eval-suite.ts` (DEC-022), `telemetry.ts` (DEC-024) | ✅ |
 
 Node functions (`query_understanding`, `router`, `retrieve`, `rerank`,
 `generate`) all live in `src/retrieval/nodes.py` — not separate files.
@@ -185,10 +186,10 @@ Node functions (`query_understanding`, `router`, `retrieve`, `rerank`,
   `WEAVE_ENABLED` is set (DEC-017).
 - **Cost / failure trackers** ✅ `src/utils/` — per-query cost + 5-mode failure
   classification, returned on `/query` and logged to JSONL.
-- **Frontend telemetry** ✅ (optional) per-query outcome / TTFT / total latency /
-  route / tokens / cost and uncaught client errors, written to insert-only
-  Bolt Database tables; no question text; reads only via the `telemetry_summary()`
-  aggregate (DEC-023).
+- **Frontend telemetry** ✅ per-query outcome / TTFT / total latency / route /
+  tokens / cost and uncaught client errors, posted to `/telemetry/*` and stored in
+  Neon Postgres; Pydantic-bounded, rate-limited per IP; no question text; reads
+  only via the `/telemetry/summary` aggregate (DEC-024, supersedes DEC-023).
 
 ---
 
@@ -232,12 +233,11 @@ external cron pinging `/health` (Render backup only; Cloud Run is always on).
 
 ```
 Browser ── frontend/dist (any static host: Vercel / Netlify / GCS + Cloud CDN)
-   ├──> finsight-api (Cloud Run)   POST /query/stream · POST /query · GET /health · /recommend · /feedback
-   └──> Bolt Database (optional)   insert-only telemetry
+   └──> finsight-api (Cloud Run)   POST /query/stream · POST /query · GET /health · /recommend · /feedback · /telemetry/*
+           └──> Neon Postgres (AWS us-east-2)   telemetry + feedback (DATABASE_URL from Secret Manager)
 ```
 
-Build with `npm run build` in `frontend/`; `VITE_API_URL` / `VITE_SUPABASE_URL` /
-`VITE_SUPABASE_ANON_KEY` are inlined at build time (see `frontend/.env.example`).
+Build with `npm run build` in `frontend/`; `VITE_API_URL` (optional) is inlined at build time (see `frontend/.env.example`).
 The API must allow the frontend origin via `CORS_ALLOW_ORIGINS` (unset today → `*`).
 Steps: README → *Deploy the frontend (static)*.
 

@@ -844,7 +844,9 @@ Option C, in `frontend/src/lib/eval-suite.ts`.
 
 ## DEC-023: Client telemetry in Bolt Database (Supabase Postgres) instead of a vendor SDK
 
-**Date:** 2026-10-15 · **Status:** Accepted
+**Date:** 2026-10-15 · **Status:** Superseded by DEC-024 (2026-10-16)
+
+> **Superseded:** the browser no longer writes to Supabase. Telemetry now goes through FastAPI into Neon Postgres, with rate limiting (DEC-024). The privacy rule and the table shapes carried over unchanged. Kept for the record.
 
 ### Context
 LangSmith and the backend JSONL logs see the pipeline, not the user. What a visitor actually experienced in the browser went unrecorded: time to first token, aborted queries, client-side crashes. The frontend was built on Bolt, which provides a Supabase Postgres database ("Bolt Database"), so a store already existed with no new vendor.
@@ -880,6 +882,63 @@ Option C. The schema is in `frontend/supabase/migrations/`; the client is `front
 ### Revisit trigger
 - Junk or abusive inserts show up → add rate limiting in front of the insert path (edge function or per-session caps).
 - Real users and an on-call need → move errors to a vendor with alerting and source maps, and keep the privacy rule (no question text).
+
+---
+
+## DEC-024: Telemetry and feedback through FastAPI into Neon Postgres (supersedes DEC-023)
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+### Context
+DEC-023 had the browser insert telemetry straight into Bolt's Supabase project using a public anon key. That left three problems:
+- **Unbounded volume.** Anyone with the bundle could insert rows. DEC-023 named this as its open hole.
+- **Off-stack.** The target stack is FastAPI + Pydantic + PostgreSQL, with no vendor BaaS for app data. Supabase was there only because the frontend was scaffolded on Bolt.
+- **Lost feedback.** `/feedback` appended to `logs/feedback.jsonl` on the Cloud Run container's local disk. That is lost whenever an instance is replaced, including on every deploy.
+
+### Options considered
+A. **Keep Supabase and add an edge-function rate limiter.** This is the smallest change, but it keeps a BaaS on the data path and a database credential in the bundle.
+B. **Cloud SQL for PostgreSQL.** It sits in the same GCP project with IAM auth, but it means a standing instance for a demo with near-zero traffic.
+C. **Neon serverless Postgres behind FastAPI.** Compute scales to zero when idle. It's standard Postgres, so moving to Cloud SQL or RDS later is a connection-string change.
+
+### Decision
+Option C.
+- **Data path:** browser → `POST /telemetry/query`, `POST /telemetry/error` → FastAPI → Postgres. The dashboard reads `GET /telemetry/summary?window_hours=` (1–720), which returns aggregates only. Raw rows have no read endpoint.
+- **Schema:** `src/telemetry/schema.sql`, applied with `python -m scripts.init_db` (idempotent).
+  - `query_events` and `client_errors` keep DEC-023's columns and CHECK constraints.
+  - A new `feedback` table stores `/feedback`. Its request and response are unchanged.
+  - Row-level security is gone: only the API connects.
+- **Validation:** the Pydantic models mirror every CHECK bound, so bad input is a 422 before it reaches the database.
+- **Rate limit:** 30 writes per minute per client IP on the three write endpoints, then 429.
+  - It keys on the last `X-Forwarded-For` entry, which Cloud Run appends; earlier entries are client-supplied.
+  - The counter is in-memory, per instance.
+- **Connection:** the Neon *pooled* URL is stored in Secret Manager as `finsight-database-url` and exposed to Cloud Run as `DATABASE_URL`.
+  - Each request opens one short-lived psycopg connection. Neon's PgBouncer does the pooling, and none of this is on the answer path.
+  - `prepare_threshold=None`, because PgBouncer's transaction mode can't hold prepared statements.
+- **Degradation:** with `DATABASE_URL` unset, `/telemetry/*` returns 503 and `/feedback` falls back to JSONL (local dev, CI). A database error is a 503. The query path never touches the database.
+- **Neon setup:**
+  - Region: AWS us-east-2, the closest offered region to Cloud Run us-central1.
+  - Postgres only. Neon Auth, Functions, Realtime, the AI gateway and object storage are off.
+  - The Supabase SDK and `frontend/supabase/` are removed.
+
+### Trade-offs
+- **Gain:**
+  - The browser holds no database credential.
+  - Volume is bounded per IP.
+  - Feedback survives deploys.
+  - One backend owns all writes, in the standard stack.
+- **Lose:**
+  - **Telemetry depends on the API.** When the API is down the frontend is in demo mode, and those events are dropped. Demo traffic was excluded from the summary anyway.
+  - **The rate limit is approximate.** It's per instance (max-instances=2) and resets on deploy. Many IPs can still write junk, but only within the CHECK bounds.
+  - **Latency on writes.** Each write pays a fresh TLS connection and a GCP Iowa → AWS Ohio hop. After an idle period, Neon's compute has to wake up first. Not measured; fire-and-forget hides it.
+  - **Feedback persists question text** (first 300 chars, as before) with no retention limit. Telemetry still stores no question text.
+
+### Interview framing
+> "My first telemetry design had the browser write straight to a hosted Postgres with a public key, and I'd flagged volume as the hole. I moved it behind the API. Pydantic bounds mirror the CHECK constraints, there's a per-IP rate limit, and Neon Postgres scales to zero. The browser no longer holds a credential. The fix also caught a quieter bug: feedback was being written to a container's local disk and lost on every deploy."
+
+### Revisit trigger
+- Abuse shows up → move the limiter to Redis or Cloud Armor so it's shared across instances.
+- Sustained traffic → add a psycopg connection pool, or batch writes.
+- Feedback grows or real users arrive → set a retention policy for feedback text.
 
 ---
 

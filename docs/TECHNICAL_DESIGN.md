@@ -3,7 +3,7 @@
 **System:** FinSight — a production RAG system for investor-grade financial research.
 **Status:** Weeks 1–4 complete + React frontend; live on Google Cloud Run (always on, DEC-019) + Qdrant Cloud; Render kept as a backup.
 **Companion docs:** [architecture.md](architecture.md) (diagrams), [CODE_WALKTHROUGH.md](CODE_WALKTHROUGH.md)
-(reading order), [decisions.md](decisions.md) (decision log DEC-001…023), [PRD.md](PRD.md) (product).
+(reading order), [decisions.md](decisions.md) (decision log DEC-001…024), [PRD.md](PRD.md) (product).
 
 ---
 
@@ -171,7 +171,7 @@ signal.
   rerank sharpens ordering (MRR/NDCG) more than coverage (Recall).
 - **Faithfulness (anti-hallucination gate):** RAGAS **0.806** — passes the 0.80
   North-Star gate (Claude judge + Voyage embeddings).
-- **CI:** lightweight per-push (ruff + serve-import guard + 29 unit tests, no API
+- **CI:** lightweight per-push (ruff + serve-import guard + 37 unit tests, no API
   calls). The expensive RAGAS gate runs manually/pre-deploy by design. A separate
   `frontend-ci` workflow typechecks, runs 27 Vitest tests and builds `frontend/`.
 - **Live behavioral suite** (DEC-022): 9 cases run from the frontend against the
@@ -201,9 +201,10 @@ client that fits 512MB.
 **Observability:** LangSmith per-node tracing; W&B Weave `@op` on all 6 nodes
 (opt-in via `WEAVE_ENABLED`, DEC-017); per-query cost estimate
 (`cost_tracker`) and 5-mode failure classification (`failure_tracker`) logged to
-JSONL; `/feedback` captures thumbs up/down. Client-side, the frontend optionally
+JSONL; `/feedback` captures thumbs up/down (Postgres). Client-side, the frontend
 records per-query outcome / TTFT / latency / route / tokens / cost and uncaught
-errors to insert-only Bolt Database (Supabase) tables — no question text (DEC-023).
+errors through `/telemetry/*` into Neon Postgres — rate-limited, no question text
+(DEC-024, superseding DEC-023's direct-to-Supabase writes).
 
 **Resilience chain:** Voyage down → bge-m3 local; Cohere down → local cross-encoder
 → raw order; Claude down → pipeline nodes degrade to safe defaults; ungrounded →
