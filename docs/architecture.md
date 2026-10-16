@@ -1,7 +1,7 @@
 # FinSight — Architecture
 
 **Canonical spec:** `docs/finsight_spec_v2.3.md`
-**Last updated:** 2026-07-14 (Weeks 1–4 complete — full pipeline + conflict detector + evals live)
+**Last updated:** 2026-10-15 (Weeks 1–4 complete — full pipeline + conflict detector + evals live; Cloud Run deploy; React frontend added)
 
 **Legend:** ✅ implemented & live · 🔶 partial · 🔷 planned. This doc describes
 what's actually built; planned nodes are marked so it stays honest to a reviewer.
@@ -12,7 +12,11 @@ what's actually built; planned nodes are marked so it stays honest to a reviewer
 
 ```mermaid
 flowchart TB
-    U[User Query] --> N1[Node 1 ✅<br/>Query Understanding — Haiku<br/>rewrite + ticker + temporal ref]
+    FE[React frontend ✅<br/>frontend/ · browser, CORS] --> API[FastAPI ✅<br/>Cloud Run finsight-api]
+    ST[Streamlit ✅<br/>Cloud Run finsight-ui] --> API
+    FE -.optional telemetry, insert-only.-> TD[(Bolt Database ✅<br/>query_events · client_errors)]
+    API --> U[User Query]
+    U --> N1[Node 1 ✅<br/>Query Understanding — Haiku<br/>rewrite + ticker + temporal ref]
     N1 --> N2[Node 2 ✅<br/>Router — Haiku, 3-path]
     N2 --> N3[Node 3 ✅<br/>Retrieve<br/>Qdrant hybrid BM25+dense RRF]
     N3 --> N4[Node 4 ✅<br/>Rerank + temporal boost<br/>Cohere 3.5 + local fallback]
@@ -94,7 +98,7 @@ raw query
        │   - Abstains ("INSUFFICIENT EVIDENCE") when chunks don't support an answer
        │   - Computes per-query cost + logs failure-mode classification
 
-streaming response to client (FastAPI /query, /query/stream → Streamlit)
+streaming response to client (FastAPI /query, /query/stream → Streamlit or the React frontend)
 ```
 
 ### Planned nodes (Week 4+) — slot into the same graph
@@ -162,6 +166,7 @@ Builder), `faithfulness_score`, `guardrail_flags` (inline guardrails).
 | `src/utils/` | Config, logging, cost + failure trackers | `config.py`, `logging.py`, `cost_tracker.py`, `failure_tracker.py` | ✅ |
 | `api/` | FastAPI async serving | `main.py` (`/health`, `/query`, `/query/stream`, `/recommend`, `/feedback`) | ✅ |
 | `ui/` | Streamlit 5-tab demo | `streamlit_app.py` | ✅ |
+| `frontend/` | React + Vite evidence UI (Ask · Architecture · Evaluation), live eval suite, client telemetry | `src/lib/api.ts` (SSE client), `evidence.ts` (citations, DEC-020), `eval-suite.ts` (DEC-022), `telemetry.ts` (DEC-023), `supabase/migrations/` | ✅ |
 
 Node functions (`query_understanding`, `router`, `retrieve`, `rerank`,
 `generate`) all live in `src/retrieval/nodes.py` — not separate files.
@@ -174,8 +179,16 @@ Node functions (`query_understanding`, `router`, `retrieve`, `rerank`,
   `LANGSMITH_API_KEY` set. Project: `finsight-dev`.
 - **Per-node latency** ✅ captured in `FinSightState.latency_ms` and returned in
   the `/query` response (`latency_per_node_ms`).
-- **MLflow** 🔷 ablation-run tracking — Week 3.
-- **Cost / failure trackers** 🔷 `src/utils/` — Week 4.
+- **MLflow** — scoped out: the ablations are one-shot, so results are git-versioned
+  JSON in `evals/results/` instead (DEC-016).
+- **W&B Weave** ✅ `@op` on all 6 graph nodes, same spans as LangSmith; off unless
+  `WEAVE_ENABLED` is set (DEC-017).
+- **Cost / failure trackers** ✅ `src/utils/` — per-query cost + 5-mode failure
+  classification, returned on `/query` and logged to JSONL.
+- **Frontend telemetry** ✅ (optional) per-query outcome / TTFT / total latency /
+  route / tokens / cost and uncaught client errors, written to insert-only
+  Bolt Database tables; no question text; reads only via the `telemetry_summary()`
+  aggregate (DEC-023).
 
 ---
 
@@ -193,7 +206,13 @@ localhost
 Qdrant runs via Colima or Docker Compose locally (DEC: Colima chosen — no Docker
 Desktop account needed). bge-m3 embeddings available locally as the Voyage fallback.
 
-### Prod (Render + Qdrant Cloud) — LIVE
+### Prod (Cloud Run + Qdrant Cloud) — LIVE
+
+Since DEC-019 the live demo runs on Google Cloud Run: `finsight-api` and
+`finsight-ui` from one image, `min-instances=1` (no cold start), secrets in Secret
+Manager. The Render topology below is kept as the backup and still applies to it.
+
+### Backup (Render + Qdrant Cloud)
 
 ```
 Render (free tier)                         Qdrant Cloud (free 1GB, finsight-prod)
@@ -207,7 +226,20 @@ Render (free tier)                         Qdrant Cloud (free 1GB, finsight-prod
 for embeddings (no bge-m3 model in the 512MB dyno) and reads full chunk text from
 the Qdrant payload (no 664MB DuckDB shipped). `USE_DUCKDB_HYDRATION=false`,
 `EMBEDDING_BACKEND=voyage`. Cold-start (~50s after 15-min idle) mitigated by an
-external cron pinging `/health`.
+external cron pinging `/health` (Render backup only; Cloud Run is always on).
+
+### Frontend (static)
+
+```
+Browser ── frontend/dist (any static host: Vercel / Netlify / GCS + Cloud CDN)
+   ├──> finsight-api (Cloud Run)   POST /query/stream · POST /query · GET /health · /recommend · /feedback
+   └──> Bolt Database (optional)   insert-only telemetry
+```
+
+Build with `npm run build` in `frontend/`; `VITE_API_URL` / `VITE_SUPABASE_URL` /
+`VITE_SUPABASE_ANON_KEY` are inlined at build time (see `frontend/.env.example`).
+The API must allow the frontend origin via `CORS_ALLOW_ORIGINS` (unset today → `*`).
+Steps: README → *Deploy the frontend (static)*.
 
 ---
 

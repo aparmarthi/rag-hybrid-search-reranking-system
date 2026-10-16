@@ -117,7 +117,9 @@ lines) — answer generation. Claude Sonnet, `generate()` (batch) and
 `generate_stream()` (SSE token streaming). **Interview point:** citations are
 **inline `[N]` markers parsed post-hoc** into structured `Citation` objects — a
 deliberate choice over forced tool-use, because forced-tool-use buffers the whole
-JSON and kills streaming (first token 11s→1.3s). Also: pinned to `api.anthropic.com`
+JSON and kills streaming (first token 11s→1.3s; a Week-1 number, before the
+pre-generation nodes existed. Live end-to-end TTFT through the full pipeline is
+4.3s, DEC-018). Also: pinned to `api.anthropic.com`
 + certifi to bypass a corporate proxy; abstains ("INSUFFICIENT EVIDENCE") when
 ungrounded.
 
@@ -192,9 +194,13 @@ production-observability signals.
 ## Layer 4 — Tests & scripts (supporting cast)
 
 - **[tests/test_unit.py](../tests/test_unit.py)** + **[test_week4.py](../tests/test_week4.py)** —
-  23 no-API unit tests: chunking, conflict precision gates, temporal boost,
-  citation parsing, cost math, failure classification, the feedback endpoint. These
-  are what CI runs.
+  29 no-API unit tests: chunking, conflict precision gates, temporal boost,
+  citation parsing, cost math, failure classification, the feedback endpoint, and
+  503 / SSE-error degradation on LLM-provider failure. These are what CI runs.
+- **[frontend/src/lib/](../frontend/src/lib/)** — the React frontend's logic layer and
+  its 27 Vitest tests: the SSE parser (`api.ts`), the `[N]` → `chunks[N-1]` citation
+  helpers (`evidence.ts`, DEC-020), and the live eval suite (`eval-suite.ts`, DEC-022).
+  Run by the `frontend-ci` workflow.
 - **[scripts/](../scripts/)** — operational tooling: `download_sec_edgar.py`,
   `add_sparse_vectors.py` (populate BM25 vectors), `push_to_cloud.py` (local→Qdrant
   Cloud), `reembed_chunks.py` (resumable re-embed), `check_serve_imports.py` (CI
