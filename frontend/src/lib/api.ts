@@ -38,6 +38,7 @@ export interface LatencyPerNode {
   retrieve: number;
   rerank: number;
   detect_conflicts: number;
+  generate?: number; // present on /query; derived from the total on the stream path
 }
 
 export interface TokenUsage {
@@ -53,7 +54,7 @@ export interface QueryResult {
   routing_path: string;
   rewritten_query: string;
   staleness_flag: boolean;
-  temporal_reference: TemporalReference;
+  temporal_reference: TemporalReference | null;
   conflicts: Conflict[];
   citations: Citation[];
   chunks: EvidenceChunk[];

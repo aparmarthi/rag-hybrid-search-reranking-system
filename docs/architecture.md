@@ -90,7 +90,7 @@ raw query
        │   - Query-relative recency boost; staleness flag if evidence off-period
        │
        ▸ Node 5 ✅ Detect Conflicts (the differentiator)
-       │   - Gated on comparison/guidance intent (extraction is ~14s — skip otherwise)
+       │   - Gated on comparison/guidance intent (extraction is ~14s, ~25s measured live — skip otherwise)
        │   - Extract numeric claims → flag cross-call contradictions (precision-gated)
        │
        ▸ Node 6 ✅ Generate (Sonnet 4.6)

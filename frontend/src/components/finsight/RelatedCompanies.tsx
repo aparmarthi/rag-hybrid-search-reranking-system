@@ -16,7 +16,7 @@ export function RelatedCompanies({ ticker, demo, onPick }: Props) {
     let cancelled = false;
     setData(null);
     if (demo) {
-      setData({ ...DEMO_RECOMMEND, ticker });
+      if (ticker === DEMO_RECOMMEND.ticker) setData(DEMO_RECOMMEND);
       return;
     }
     fetchRecommendations(ticker)

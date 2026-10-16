@@ -53,12 +53,14 @@ export const ROUTING_PATHS: { id: string; description: string }[] = [
   { id: 'risk_and_events', description: 'Risk factors and material events. Same interim state: honest abstention until SEC filings land.' },
 ];
 
+// Live per-node medians, evals/results/live_measurements_20261016T045744Z.json. Conflict
+// detection is gated off (0 ms) on most queries; when it runs it takes ~25 s.
 export const PIPELINE_STAGES = [
-  { label: 'Understanding query', ms: 1500 },
-  { label: 'Routing', ms: 800 },
-  { label: 'Retrieving', ms: 400 },
-  { label: 'Reranking', ms: 1900 },
-  { label: 'Checking conflicts', ms: 400 },
+  { label: 'Understanding query', ms: 1170 },
+  { label: 'Routing', ms: 910 },
+  { label: 'Retrieving', ms: 340 },
+  { label: 'Reranking', ms: 150 },
+  { label: 'Checking conflicts', ms: 0 },
   { label: 'Generating', ms: Infinity },
 ] as const;
 

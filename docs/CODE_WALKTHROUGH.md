@@ -119,7 +119,7 @@ lines) — answer generation. Claude Sonnet, `generate()` (batch) and
 deliberate choice over forced tool-use, because forced-tool-use buffers the whole
 JSON and kills streaming (first token 11s→1.3s; a Week-1 number, before the
 pre-generation nodes existed. Live end-to-end TTFT through the full pipeline is
-4.3s, DEC-018). Also: pinned to `api.anthropic.com`
+3.6s median, n=4 on 2026-10-16, DEC-018). Also: pinned to `api.anthropic.com`
 + certifi to bypass a corporate proxy; abstains ("INSUFFICIENT EVIDENCE") when
 ungrounded.
 
@@ -134,7 +134,7 @@ node functions.** `query_understanding` (Haiku: rewrite + ticker + temporal ref)
 temporal boost + staleness flag), `detect_conflicts` (gated on comparison intent),
 `generate` (+ cost + failure-mode logging). **Interview points:** the two Haiku
 nodes vs Sonnet generation = the *cost-routing story*; every node degrades
-gracefully on error; conflict detection is intent-gated so its ~14s cost is only
+gracefully on error; conflict detection is intent-gated so its ~14s cost (~25s measured live) is only
 paid when relevant.
 
 **15. [src/retrieval/graph.py](../src/retrieval/graph.py)** (~73 lines) — **the
