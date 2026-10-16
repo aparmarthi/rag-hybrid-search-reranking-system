@@ -1,14 +1,8 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getApiUrl } from './api';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-const client: SupabaseClient | null =
-  url && key && import.meta.env.MODE !== 'test'
-    ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-    : null;
-
-export const telemetryEnabled = client !== null;
+// Browser → FastAPI → Postgres (DEC-024). Fire-and-forget: a failed write logs a
+// console warning and is dropped. Off in unit tests.
+export const telemetryEnabled = import.meta.env.MODE !== 'test';
 
 const SESSION_ID = crypto.randomUUID();
 
@@ -28,11 +22,22 @@ export interface QueryEvent {
   errorMessage?: string | null;
 }
 
+function post(path: string, body: object, what: string): void {
+  if (!telemetryEnabled) return;
+  void fetch(`${getApiUrl()}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    keepalive: true,
+  })
+    .then((r) => !r.ok && console.warn(`[telemetry] ${what} dropped`, r.status))
+    .catch((err: unknown) => console.warn(`[telemetry] ${what} dropped`, err instanceof Error ? err.message : err));
+}
+
 export function reportQuery(e: QueryEvent): void {
-  if (!client) return;
-  void client
-    .from('query_events')
-    .insert({
+  post(
+    '/telemetry/query',
+    {
       session_id: SESSION_ID,
       mode: e.mode,
       outcome: e.outcome,
@@ -44,24 +49,25 @@ export function reportQuery(e: QueryEvent): void {
       tokens_out: int(e.tokensOut),
       cost_usd: typeof e.costUsd === 'number' && Number.isFinite(e.costUsd) ? e.costUsd : null,
       error_message: clip(e.errorMessage, 500),
-    })
-    .then(({ error }) => error && console.warn('[telemetry] query event dropped', error.message));
+    },
+    'query event',
+  );
 }
 
 export function reportError(source: 'boundary' | 'window' | 'promise', err: unknown): void {
-  if (!client) return;
   const e = err instanceof Error ? err : new Error(typeof err === 'string' ? err : 'Unknown error');
-  void client
-    .from('client_errors')
-    .insert({
+  post(
+    '/telemetry/error',
+    {
       session_id: SESSION_ID,
       source,
       message: clip(e.message || 'Unknown error', 500),
       stack: clip(e.stack, 4000),
       url: clip(window.location.origin + window.location.pathname, 500),
       user_agent: clip(navigator.userAgent, 300),
-    })
-    .then(({ error }) => error && console.warn('[telemetry] error report dropped', error.message));
+    },
+    'error report',
+  );
 }
 
 let installed = false;
@@ -93,9 +99,17 @@ function isSummary(v: unknown): v is TelemetrySummary {
 }
 
 export async function fetchTelemetrySummary(windowHours: number): Promise<TelemetrySummary> {
-  if (!client) throw new Error('Telemetry is not configured.');
-  const { data, error } = await client.rpc('telemetry_summary', { window_hours: windowHours });
-  if (error) throw new Error(error.message);
+  let res: Response;
+  try {
+    res = await fetch(`${getApiUrl()}/telemetry/summary?window_hours=${windowHours}`);
+  } catch {
+    throw new Error('Could not reach the API.');
+  }
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const detail = (data as { detail?: unknown } | null)?.detail;
+    throw new Error(typeof detail === 'string' ? detail : `Telemetry request failed (${res.status}).`);
+  }
   if (!isSummary(data)) throw new Error('Unexpected telemetry response.');
   return data;
 }
