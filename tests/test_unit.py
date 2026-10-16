@@ -107,3 +107,30 @@ def test_temporal_staleness_flags_out_of_range():
     chunks = [RetrievedChunk("c1", "t", 0.9, "AAPL", "earnings_transcript", None, "2020-01-28", 2020, 1)]
     _, stale = _apply_temporal_boost(chunks, {"year": 2015, "quarter": None})  # far pre-corpus
     assert stale is True
+
+
+# ---- Conflict intent gate (DEC-007) ----
+def test_conflict_gate_ignores_rewrite_wording():
+    from src.retrieval import nodes
+
+    state = {"raw_query": "What did Apple say about iPhone supply in 2020?",
+             "rewritten_query": "Compare Apple iPhone supply guidance across 2020 calls", "reranked": []}
+    out = nodes.detect_conflicts(state)
+    assert out["latency_ms"]["detect_conflicts"] == 0
+
+
+def test_conflict_gate_runs_on_user_intent(monkeypatch):
+    from src.retrieval import nodes
+
+    calls = []
+
+    class _Detector:
+        def detect(self, chunks):
+            calls.append(chunks)
+            return []
+
+    monkeypatch.setattr(nodes, "_conflict_detector", lambda: _Detector())
+    state = {"raw_query": "Did NVIDIA's revenue guidance match actual results?",
+             "rewritten_query": "NVIDIA revenue results", "reranked": []}
+    nodes.detect_conflicts(state)
+    assert len(calls) == 1
