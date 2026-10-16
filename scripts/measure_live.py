@@ -36,8 +36,8 @@ GROUNDED = [
     "How did Tesla's Shanghai Model 3 margins compare to Model 3 margins produced in Fremont during Q1 2020?",
 ]
 CONFLICT = [
-    "Did company revenue guidance match actual results?",
-    "How did management revise its full-year outlook over the year?",
+    "Did Progress Software's Q3 2021 revenue match the guidance it gave in June 2021?",
+    "How did Progress Software raise its full-year 2021 revenue guidance over the year?",
 ]
 REFUSE = [
     "What did Apple say about iPhone sales in 2015?",

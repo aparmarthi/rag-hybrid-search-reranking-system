@@ -171,7 +171,7 @@ signal.
   rerank sharpens ordering (MRR/NDCG) more than coverage (Recall).
 - **Faithfulness (anti-hallucination gate):** RAGAS **0.806** — passes the 0.80
   North-Star gate (Claude judge + Voyage embeddings).
-- **CI:** lightweight per-push (ruff + serve-import guard + 37 unit tests, no API
+- **CI:** lightweight per-push (ruff + serve-import guard + 39 unit tests, no API
   calls). The expensive RAGAS gate runs manually/pre-deploy by design. A separate
   `frontend-ci` workflow typechecks, runs 27 Vitest tests and builds `frontend/`.
 - **Live behavioral suite** (DEC-022): 9 cases run from the frontend against the

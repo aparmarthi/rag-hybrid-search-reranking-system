@@ -269,8 +269,9 @@ def detect_conflicts(state: FinSightState) -> dict:
     never breaks the answer: any failure yields no conflicts."""
     t = time.perf_counter()
     conflicts = []
-    query = state.get("rewritten_query") or state.get("raw_query", "")
-    if not _wants_conflict_check(query):
+    # Gate on the user's own words, not the Haiku rewrite: the rewrite's wording varies
+    # run to run, which made the same question flip between a 0 s and a ~25 s path.
+    if not _wants_conflict_check(state.get("raw_query", "")):
         return {"conflicts": [], "latency_ms": {**state.get("latency_ms", {}), "detect_conflicts": 0}}
     try:
         found = _conflict_detector().detect(state.get("reranked", []))

@@ -194,7 +194,7 @@ production-observability signals.
 ## Layer 4 — Tests & scripts (supporting cast)
 
 - **[tests/test_unit.py](../tests/test_unit.py)** + **[test_week4.py](../tests/test_week4.py)** + **[test_telemetry.py](../tests/test_telemetry.py)** —
-  37 no-API unit tests: chunking, conflict precision gates, temporal boost,
+  39 no-API unit tests: chunking, conflict precision + intent gates, temporal boost,
   citation parsing, cost math, failure classification, the feedback endpoint,
   503 / SSE-error degradation on LLM-provider failure, and telemetry validation + rate limiting (DEC-024). These are what CI runs.
 - **[frontend/src/lib/](../frontend/src/lib/)** — the React frontend's logic layer and

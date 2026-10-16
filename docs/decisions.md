@@ -281,6 +281,8 @@ comparison queries pay the cost for the differentiator. No extra LLM call to dec
 
 *Note (2026-10-16):* measured live, the extraction took **23.8–25.3s** (n=3, `evals/results/live_measurements_20261016T045744Z.json`), above the 14–20s estimate. The gate reads the Haiku-*rewritten* query, not the user's text, so it is only as stable as the rewrite. The Tesla Shanghai-vs-Fremont question ran the node on `/query` (rewrite: "…compared to Fremont factory…", which hits `compare`). Minutes later, a `/query/stream` run of the same question reached first token in 3.6s, too fast for a 25s extraction, so the gate was almost certainly off. That is inferred from timing; the measurement script didn't record the stream's per-node latencies. Not changed yet: gating on the raw query (or on raw OR rewritten) would make it deterministic.
 
+*Update (2026-10-16, later):* changed. The gate now reads the user's own question (`raw_query`), so the same question always takes the same path. Reproduced live first: "What revenue did Progress Software expect for the third quarter of 2021, and how did actual Q3 revenue compare?" contains `compare`, but Haiku rewrote it to "Progress Software expected and actual revenue for Q3 2021" and the node was skipped (0 ms, `evals/results/live_capture_20261016T161847Z_conflict_examples.json`). Chose raw-only over raw-OR-rewritten: the OR version keeps the rewrite's run-to-run variance on any question whose own wording has no signal. Trade-off: a question that only implies comparison, with none of the keywords, now never runs the node. Two unit tests pin the behavior (`tests/test_unit.py`).
+
 ### Honest limitation — the retrieval-pairing gap
 The detector is correct, but **standard retrieval doesn't reliably fetch both
 halves of a conflict pair** (a ticker's guidance chunk AND its later-actual chunk)
@@ -289,6 +291,8 @@ engine can detect. The engine is proven on paired evidence; a conflict-oriented
 retrieval mode (deliberately fetch a ticker's guidance + subsequent actuals) is
 the follow-on. Documented rather than hidden — better to say "the detector is
 right; the retrieval that feeds it needs a conflict-aware mode" than to fake it.
+
+*Concrete case (2026-10-16):* Progress Software (PRGS) guided Q3 2021 revenue at $129–132M on the June 2021 call (`mf_PRGS_2021Q2_c5`) and reported $152.6M in September (`mf_PRGS_2021Q3_c3`), roughly 14% apart, well past the 3% revenue threshold. Asked live "Did Progress Software's Q3 2021 revenue match the guidance it gave in June 2021?", the system answered correctly from the September chunk alone ("~$22 million above the midpoint"), but the June chunk wasn't in the top 5, so the detector had only one side and flagged nothing (`evals/results/live_capture_20261016T161847Z_conflict_examples.json`). These two PRGS questions are now the UI's Conflict-check examples: both ground, and both run the node. Replaced "Did company revenue guidance match actual results?", which abstained on the 04:57 UTC capture.
 
 ### Trade-offs
 - **Gain:** a real, precision-first conflict detector with a genuine "here's how I

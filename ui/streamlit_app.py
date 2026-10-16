@@ -131,8 +131,8 @@ with tab_conflict:
                 "guidance/comparison question — the detector flags numeric claims that disagree "
                 "(guidance vs actual, cross-quarter drift).")
     examples = [
-        "Did company revenue guidance match actual results?",
-        "How did management revise its full-year outlook over the year?",
+        "Did Progress Software's Q3 2021 revenue match the guidance it gave in June 2021?",
+        "How did Progress Software raise its full-year 2021 revenue guidance over the year?",
         "Compare guided vs reported margins across quarters",
     ]
     cq = st.selectbox("Try a conflict-oriented query", examples)
