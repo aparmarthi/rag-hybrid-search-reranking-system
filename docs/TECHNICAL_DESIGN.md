@@ -120,10 +120,10 @@ A single `FinSightState` TypedDict threads through six nodes (`src/retrieval/`):
 
 **Cost-routing design:** cheap Haiku for classification/rewrite (nodes 1–2),
 expensive Sonnet only for reasoning (nodes 5–6). Measured per-node latency makes
-this concrete (Haiku ~700-900ms vs Sonnet generate ~5s).
+this concrete (Haiku ~700-900ms vs Sonnet generate ~5s; live medians on 2026-10-16 were 0.9–1.2s per Haiku node vs 7.5s for generate).
 
 **Served by FastAPI** (`api/main.py`): `/query` (full pipeline), `/query/stream`
-(SSE token streaming; first token 4.3s end-to-end on the live deploy, DEC-018 —
+(SSE token streaming; first token 3.6s median end-to-end on the live deploy, n=4 on 2026-10-16 (earlier 4.3s), DEC-018 —
 DEC-011's ~1.3s was a Week-1 figure from before the pre-generation nodes existed),
 `/recommend/{ticker}`, `/feedback`, `/health`. Lazy singletons + a `lifespan`
 warmup avoid cold-start on the first real query.
@@ -147,7 +147,7 @@ the tradeoff.
 | **Embeddings** (DEC-003, 012) | voyage-finance-2 (API) + bge-m3 (local) | Domain-tuned + deploy-friendly (no model in the 512MB dyno). Fallback for offline/degraded. |
 | **Retrieval** (DEC-013) | Hybrid BM25+dense, native RRF | +27.4% NDCG vs dense-only (measured). One server-side call, no client merge. |
 | **Reranker** (DEC-006) | Cohere rerank-v3.5 + local ms-marco fallback | Managed quality, no GPU ops; graceful degradation on outage. |
-| **Citations** (DEC-011) | Inline [N] parsed post-hoc, NOT forced tool-use | Forced tool-use buffers the whole JSON → kills streaming (first token 11s→1.3s, Week-1 generator path; live end-to-end TTFT is 4.3s, DEC-018). Production-idiomatic (Perplexity-style). |
+| **Citations** (DEC-011) | Inline [N] parsed post-hoc, NOT forced tool-use | Forced tool-use buffers the whole JSON → kills streaming (first token 11s→1.3s, Week-1 generator path; live end-to-end TTFT is 3.6s median, DEC-018). Production-idiomatic (Perplexity-style). |
 | **Conflict detector** (DEC-007) | Intra-transcript, precision-gated | Cross-source needs SEC XBRL (not ingested). Precision gates (period/subject/date/chunk) kill false positives. |
 | **Recency** (DEC-014) | Query-relative temporal boost | Historical corpus — "recent" = near the *queried* period, not wall-clock newest. Flags staleness → honest abstention. |
 | **LLM provider** (DEC-010 → DEC-018) | Gateway switch: OpenRouter's Anthropic-compatible endpoint *or* Anthropic direct (`LLM_GATEWAY`) | DEC-010 rejected OpenRouter's OpenAI-compat layer (loses caching + tool use); DEC-018 uses its Anthropic-compatible Messages endpoint instead — same SDK, tool use and streaming. |

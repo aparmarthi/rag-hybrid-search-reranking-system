@@ -150,8 +150,8 @@ Reproduce: `python -m src.evaluation.ablation` / `ragas_runner` / `chunking_abla
 |---|---|---|
 | Faithfulness (RAGAS) | ≥ 0.80 | **0.806** ✅ (n=40, Claude judge + Voyage embeddings) |
 | NDCG@10 lift, hybrid+rerank vs dense | ≥ 10% | **+27.4%** ✅ |
-| P95 latency | ≤ 3s | ❌ Live, single-user: **first token 4.3s**, full answer ~12–15s (conflict-check queries ~25–30s). No load test yet; every call costs money (DEC-018). This is end-to-end TTFT on `/query/stream`, after the pre-generation nodes run. DEC-011's 1.3s was measured in Week 1, before the query-understanding, router, rerank and conflict nodes existed (DEC-013, Week 2) |
-| Cost per query | ≤ $0.005 | **$0.0135** ❌ mean (n=5 live, range $0.012–0.015) — ~3.2K tokens of retrieved evidence to Sonnet is the floor; see DEC-018 |
+| P95 latency | ≤ 3s | ❌ Live, single-user: **first token 3.6s** median (n=4, range 3.4–3.9s, 2026-10-16; an earlier run measured 4.3s), full streamed answer ~11s (conflict-check queries ~34–36s). Per-node medians: understand 1.2s, route 0.9s, retrieve 0.3s, rerank 0.15s, generate 7.5s (`evals/results/live_measurements_20261016T045744Z.json`). No load test yet; every call costs money (DEC-018). This is end-to-end TTFT on `/query/stream`, after the pre-generation nodes run. DEC-011's 1.3s was measured in Week 1, before the query-understanding, router, rerank and conflict nodes existed (DEC-013, Week 2) |
+| Cost per query | ≤ $0.005 | **$0.0139** ❌ mean (n=9 live, range $0.010–0.016, 2026-10-16; earlier n=5 mean $0.0135) — ~3.2K tokens of retrieved evidence to Sonnet is the floor; see DEC-018 |
 
 ### Ablation 1 — Retrieval (headline: hybrid+rerank vs dense)
 

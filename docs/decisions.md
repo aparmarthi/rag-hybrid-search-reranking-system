@@ -279,6 +279,8 @@ node only runs when the query is comparison/guidance-oriented (keyword gate:
 "guidance", "versus", "match", "revised", …). Plain queries skip it (0ms);
 comparison queries pay the cost for the differentiator. No extra LLM call to decide.
 
+*Note (2026-10-16):* measured live, the extraction took **23.8–25.3s** (n=3, `evals/results/live_measurements_20261016T045744Z.json`), above the 14–20s estimate. The gate reads the Haiku-*rewritten* query, not the user's text, so it is only as stable as the rewrite. The Tesla Shanghai-vs-Fremont question ran the node on `/query` (rewrite: "…compared to Fremont factory…", which hits `compare`). Minutes later, a `/query/stream` run of the same question reached first token in 3.6s, too fast for a 25s extraction, so the gate was almost certainly off. That is inferred from timing; the measurement script didn't record the stream's per-node latencies. Not changed yet: gating on the raw query (or on raw OR rewritten) would make it deterministic.
+
 ### Honest limitation — the retrieval-pairing gap
 The detector is correct, but **standard retrieval doesn't reliably fetch both
 halves of a conflict pair** (a ticker's guidance chunk AND its later-actual chunk)
@@ -546,6 +548,8 @@ Option C. Stream plain text with inline [N] markers; parse them into structured 
 
 *Note (2026-10-15):* this is a Week-1 measurement, taken before the query-understanding, router, rerank and conflict nodes existed (DEC-013, Week 2). Those nodes all run before the first token. End-to-end TTFT on the live deploy is **4.3s** (DEC-018). The two numbers measure different paths; they don't contradict each other.
 
+*Note (2026-10-16):* re-measured on `/query/stream` across the four grounded eval questions: TTFT **3.6s median (n=4, range 3.4–3.9s)**. Pre-generation node medians (n=9, `/query`) are understand 1.2s, route 0.9s, retrieve 0.3s, rerank 0.15s, ~2.6s in total. Source: `evals/results/live_measurements_20261016T045744Z.json`.
+
 ### Rationale
 1. **Both requirements met in one call** — sub-second first token AND structured, source-mapped citations. No second call, no cost penalty.
 2. **This is how production RAG does it** (Perplexity, Bing Copilot all use inline citation markers over streamed text) — a more defensible interview answer than a purpose-built tool.
@@ -665,6 +669,7 @@ Cost is **$0.0135/query mean (n=5, range $0.012–0.015)**, not the ~$0.005 the 
 - The tracked figure covers Sonnet plus retrieval. The two Haiku nodes add about $0.002 that the tracker doesn't count yet, so true cost is about $0.015.
 - `cache_read_tokens` was 0 on every call. The static system prompt is ~300 tokens, below Sonnet's 1,024-token cache minimum, so `cache_control` is wired but never fires. The evidence block changes per query and can't be cached.
 - **Latency was also over target.** On the live deploy, first streamed token arrives at 4.3s and the full answer at ~12–15s, against a P95 ≤ 3s target. Conflict-check queries take ~25–30s. These are single-user numbers; no load test has been run.
+  - *Re-measured 2026-10-16* (`evals/results/live_measurements_20261016T045744Z.json`): first token **3.6s median** (n=4, 3.4–3.9s), full streamed answer **11.0s median** (10.7–11.7s), conflict-check queries **33.9–36.1s** end to end (n=3), and cost **$0.0139/query mean** (n=9, range $0.0103–0.0156; abstentions are the cheap end). Still single-user.
 - Docs are now corrected to the measured numbers.
 - Real levers, if cost mattered at scale:
   - Top-5 → top-3 chunks, about -35% input.
