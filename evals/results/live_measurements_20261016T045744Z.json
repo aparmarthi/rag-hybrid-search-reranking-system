@@ -1,0 +1,97 @@
+{
+  "captured_at": "20261016T045744Z",
+  "api_url": "https://finsight-api-995576020018.us-central1.run.app",
+  "health": {
+    "status": "ok",
+    "qdrant_reachable": true,
+    "points_indexed": 15023,
+    "llm_gateway": "openrouter",
+    "llm_key_configured": true
+  },
+  "per_node_ms_when_run": {
+    "query_understanding": {
+      "n": 9,
+      "median": 1171,
+      "min": 1061,
+      "max": 1292
+    },
+    "router": {
+      "n": 9,
+      "median": 912,
+      "min": 817,
+      "max": 949
+    },
+    "retrieve": {
+      "n": 9,
+      "median": 340,
+      "min": 323,
+      "max": 823
+    },
+    "rerank": {
+      "n": 9,
+      "median": 146,
+      "min": 131,
+      "max": 287
+    },
+    "generate": {
+      "n": 9,
+      "median": 7533,
+      "min": 2543,
+      "max": 8425
+    },
+    "detect_conflicts": {
+      "n": 3,
+      "median": 25141,
+      "min": 23770,
+      "max": 25292
+    }
+  },
+  "query_total_ms": {
+    "n": 9,
+    "median": 10386,
+    "min": 5017,
+    "max": 36080
+  },
+  "cost_usd": {
+    "n": 9,
+    "median": 0.014881,
+    "min": 0.0103,
+    "max": 0.015592,
+    "mean": 0.013925,
+    "sum": 0.125328
+  },
+  "stream_ttft_ms": {
+    "n": 4,
+    "median": 3609.6,
+    "min": 3439.4,
+    "max": 3925.7
+  },
+  "stream_total_ms": {
+    "n": 4,
+    "median": 10990.3,
+    "min": 10682.9,
+    "max": 11671.3
+  },
+  "streams": [
+    {
+      "question": "What did Apple say about iPhone supply chain in 2020?",
+      "ttft_ms": 3439.4,
+      "total_ms": 10997.7
+    },
+    {
+      "question": "What did companies say about COVID-19 supply chain disruptions?",
+      "ttft_ms": 3618.1,
+      "total_ms": 11671.3
+    },
+    {
+      "question": "Oracle cloud revenue growth",
+      "ttft_ms": 3925.7,
+      "total_ms": 10682.9
+    },
+    {
+      "question": "How did Tesla's Shanghai Model 3 margins compare to Model 3 margins produced in Fremont during Q1 2020?",
+      "ttft_ms": 3601.1,
+      "total_ms": 10982.9
+    }
+  ]
+}
