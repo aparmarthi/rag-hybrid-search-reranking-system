@@ -99,11 +99,11 @@
 
   <!-- Tab 2 -->
   <h3>2 · Conflict detector — the differentiator <span class="pill conflict">Sonnet · gated on intent</span></h3>
-  <div class="turn user"><span class="who">You (Tab 2 · Conflict)</span><span class="say">Did company revenue guidance match actual results?</span></div>
+  <div class="turn user"><span class="who">You (Tab 2 · Conflict)</span><span class="say">Did Progress Software's Q3 2021 revenue match the guidance it gave in June 2021?</span></div>
   <div class="turn"><span class="who">FinSight</span><span class="say">Answers, then — when the evidence genuinely disagrees — surfaces an ⚠️ <b>Evidence conflict</b>: e.g. guided +15% vs delivered +9% on the same metric across two calls.</span></div>
   <div class="watch"><b>Expect 0 conflicts live (checked 2026-10-05; 0 of 4 guidance queries fired).</b> Don't wait for the flag. Say it before you click: "The detector is precision-first, and standard retrieval rarely returns both a company's guidance and its later actual, so 'none found' is the usual result. The engine is proven on paired evidence: NVDA guided 15%, delivered 9%, fires; a different-segment control doesn't." That's the unit test <code>test_conflict_score_flags_genuine_divergence</code>. The fix is a conflict-aware retrieval mode (DEC-007 revisit trigger). This query also takes ~30–40s because of the extraction call, so run it while you talk.</div>
   <div class="expect"><b>Point out:</b> this is a <b>dedicated node with its own Sonnet extraction call</b>, not a line in the generation prompt. It pulls structured numeric claims, then pure-Python pairwise-compares them behind four precision gates (different-chunk, comparable-period, same-subject, different-date) that took a naive 6-false-positives-on-query-one down to 0.</div>
-  <div class="watch"><b>Cost gate:</b> the ~14s extraction fires <b>only</b> on comparison/guidance intent (keywords: guidance, versus, revised, compare). Plain queries skip it entirely (0 ms). Other examples in the dropdown: "How did management revise its full-year outlook over the year?"</div>
+  <div class="watch"><b>Cost gate:</b> the ~14s extraction fires <b>only</b> on comparison/guidance intent in the user's own words (keywords: guidance, versus, revised, compare). Plain queries skip it entirely (0 ms). Other examples in the dropdown: "How did Progress Software raise its full-year 2021 revenue guidance over the year?"</div>
 
   <!-- Tab 3 -->
   <h3>3 · Related tickers — recommendation on shared infra <span class="pill hybrid">cosine-NN · no LLM</span></h3>

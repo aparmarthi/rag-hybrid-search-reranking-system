@@ -31,8 +31,8 @@ export const EXAMPLE_GROUPS: ExampleGroup[] = [
     label: 'Conflict check',
     hint: 'Slower: runs the guidance-vs-actual extraction node',
     questions: [
-      { text: 'Did company revenue guidance match actual results?' },
-      { text: 'How did management revise its full-year outlook over the year?' },
+      { text: "Did Progress Software's Q3 2021 revenue match the guidance it gave in June 2021?" },
+      { text: 'How did Progress Software raise its full-year 2021 revenue guidance over the year?' },
     ],
   },
   {

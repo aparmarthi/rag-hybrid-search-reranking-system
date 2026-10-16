@@ -292,6 +292,8 @@ retrieval mode (deliberately fetch a ticker's guidance + subsequent actuals) is
 the follow-on. Documented rather than hidden — better to say "the detector is
 right; the retrieval that feeds it needs a conflict-aware mode" than to fake it.
 
+*Concrete case (2026-10-16):* Progress Software (PRGS) guided Q3 2021 revenue at $129–132M on the June 2021 call (`mf_PRGS_2021Q2_c5`) and reported $152.6M in September (`mf_PRGS_2021Q3_c3`), roughly 14% apart, well past the 3% revenue threshold. Asked live "Did Progress Software's Q3 2021 revenue match the guidance it gave in June 2021?", the system answered correctly from the September chunk alone ("~$22 million above the midpoint"), but the June chunk wasn't in the top 5, so the detector had only one side and flagged nothing (`evals/results/live_capture_20261016T161847Z_conflict_examples.json`). These two PRGS questions are now the UI's Conflict-check examples: both ground, and both run the node. Replaced "Did company revenue guidance match actual results?", which abstained on the 04:57 UTC capture.
+
 ### Trade-offs
 - **Gain:** a real, precision-first conflict detector with a genuine "here's how I
   killed each false-positive class" debugging narrative — stronger than a detector
