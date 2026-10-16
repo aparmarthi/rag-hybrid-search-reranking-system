@@ -489,7 +489,7 @@ Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this pr
 
 Built by [Amey Parmarthi](https://www.linkedin.com/in/ameyparmarthi) — AI Deployment Strategist at Salesforce, leading Agentforce deployments at Fortune 500 scale in regulated industries.
 
-Related portfolio project: [KKBox Customer Retention ROI Platform](https://amey-churn-predictor.streamlit.app/) — end-to-end production ML on 31GB subscription data, dual-policy decision engine netting $17,666 in simulated net ROI.
+Related portfolio project: [AI Customer Retention & Decision Intelligence Platform](https://churn.ameyparmarthi.com) ([repo](https://github.com/aparmarthi/ai-customer-retention-mlops)) — end-to-end production ML on ~33 GB of KKBox subscription data, dual-policy decision engine netting $17,666 in simulated net ROI.
 
 ---
 
