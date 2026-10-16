@@ -730,6 +730,157 @@ Option C. Render stays up as a backup URL until the Loom is recorded.
 
 ---
 
+## DEC-020: Citation index invariant — [N] is chunks[N-1], never re-sorted client-side
+
+**Date:** 2026-10-15 · **Status:** Accepted
+
+### Context
+The generator numbers evidence by position in the reranked chunk list it was given. The answer says "revenue grew 17% [3]", and `_parse_citations` resolves `[3]` to `chunks[2]` (DEC-011). The API returns `chunks` in that same order.
+
+The new React frontend shows evidence cards beside the answer. Re-ordering those cards in the browser, by date, ticker or score, is a tempting UX change. It would silently point every `[N]` at the wrong passage. In a product whose whole claim is "every number is traceable", a wrong link is worse than no link.
+
+### Options considered
+A. **Sort client-side and renumber the answer text to match.** Rewriting model output in the browser is fragile, and the displayed answer would no longer match what the API returned or what was logged.
+B. **Map by `chunk_id` instead of position.** It survives any re-ordering. But `CitationOut` exposes only `chunk_number` and `source_label`: the internal `Citation` has `chunk_id`, the API drops it. Grouped markers like `[1, 2]` also never reach the structured list. B needs an API contract change.
+C. **Positional invariant:** `[N]` ↔ `chunks[N-1]`, and the chunk list is rendered in API order, never re-sorted.
+
+### Decision
+Option C, enforced in `frontend/src/lib/evidence.ts`.
+- Inline markers are parsed from the answer text. Grouped forms (`[1, 3]`, `[4;2]`) expand to one anchor per chunk.
+- Each anchor scrolls to evidence card N, which is `chunks[N-1]`.
+- Out-of-range markers aren't linked. The live eval suite fails them as a citation-integrity error (DEC-022).
+- Unit tests pin the invariant ("maps [N] to chunks[N-1] without re-sorting", "ignores out-of-range citations").
+
+### Trade-offs
+- **Gain:** no backend change. The link is correct by construction, and one test guards it.
+- **Lose:** evidence can only be shown in rerank order. Any "sort by date" view would have to be a separate list that doesn't drive citation links.
+- **Lose:** the frontend parses citations itself instead of trusting the structured `citations` array, because that array misses grouped markers. The two can disagree on which chunks were cited.
+
+### Interview framing
+> "The citation number is a pointer into an ordered list. The moment the UI re-sorts that list, every pointer is wrong and still looks right. I made the order an invariant with a test on it, instead of a convention someone breaks while polishing the UI."
+
+### Revisit trigger
+- The API adds `chunk_id` to `CitationOut` (or emits grouped citations) → switch to ID-based mapping. Re-sorting becomes safe.
+- The backend ever paginates, dedupes or re-orders `chunks` after generation → this invariant breaks server-side first. Fix it there.
+
+---
+
+## DEC-021: Demo-mode fallback when the API is unreachable — stale data, clearly labeled
+
+**Date:** 2026-10-15 · **Status:** Accepted
+
+### Context
+The frontend is a static site that calls the live API. If the API is down, the link a hiring manager clicks shows an error page. The backend can be down for reasons outside the frontend's control: Qdrant unreachable, a Cloud Run revision failing, LLM credit exhausted (DEC-018). DEC-019 removed cold starts, not outages.
+
+### Options considered
+A. **Show an error and a retry button.** Honest, but the visitor sees nothing of the product.
+B. **Silently serve canned answers.** It always "works", but it misrepresents a stored response as a live system. That's the exact failure this project exists to avoid.
+C. **Fall back to stored responses, labeled as such, with a path back to live.**
+
+### Decision
+Option C.
+- **When it triggers:** on load the app calls `GET /health` with a 6 s timeout. A failure, a timeout, or a missing `points_indexed` (Qdrant unreachable) puts the app in demo mode. A live `/health` with `llm_key_configured=false` stays live, and queries then surface the API's 503.
+- **What it serves:** responses from `frontend/src/lib/demo.ts`, a grounded answer, a refusal and related tickers, through the same rendering path as live results.
+- **How it's labeled:**
+  - A persistent "Demo mode" badge in the header.
+  - The status tooltip says it's replaying a captured response and offers a click to retry.
+  - The Evaluation page states that demo runs replay stored responses at no API cost.
+  - Telemetry tags these events `mode='demo'`, and the dashboard excludes them.
+
+### Trade-offs
+- **Gain:** the UI, citations, trace and eval flow stay inspectable during a backend outage.
+- **Lose:** the stored data is stale by definition. It won't reflect later corpus, prompt or model changes, so it can drift from what the live system would say.
+- **Lose:** it's a second copy of response shapes to keep in sync with `QueryResult`.
+- **Lose:** a flaky `/health` (slow but up) demotes a working backend to demo mode until the visitor retries.
+
+### Interview framing
+> "When the backend is down, the frontend degrades the same way the backend does: honestly. It shows a stored response with a badge that says so and a one-click retry. It never presents a recording as the live system."
+
+### Revisit trigger
+- The demo payloads drift visibly from live responses → regenerate them from real `/query` calls, and record the capture date in `demo.ts`.
+- `/health` timeouts cause false demo mode → add a background re-check instead of a one-shot probe.
+
+---
+
+## DEC-022: Live behavioral eval in the UI — 9 cases + citation integrity via non-streaming /query
+
+**Date:** 2026-10-15 · **Status:** Accepted
+
+### Context
+The offline benchmark (RAGAS faithfulness 0.806, n=40; +27.4% NDCG@10) is a point-in-time measurement of retrieval and generation quality (DEC-015). It runs from the CLI, needs keys, and costs tokens, so it isn't in CI. It doesn't tell you whether the *deployed* system still behaves today:
+- Does it still refuse advice questions?
+- Does the conflict node still fire?
+- Do `[N]` markers still resolve to real chunks after a prompt or model change?
+
+### Options considered
+A. **Re-run RAGAS more often.** It measures the wrong thing for this purpose, and it's the expensive path.
+B. **Add the behavioral checks to backend CI.** CI makes no API calls by design (dummy keys), so this would need live keys in CI and spend on every push.
+C. **A small behavioral suite in the frontend's Evaluation page,** run on demand against whatever API the UI points at.
+
+### Decision
+Option C, in `frontend/src/lib/eval-suite.ts`.
+- **Cases:** 9, drawn from the Ask page's example questions (4 grounded, 2 conflict-check, 3 refusals). A unit test asserts every example question is covered.
+- **Checks per case:**
+  - Expected behavior. Grounded cases must answer and refusal cases must abstain. Conflict cases require `detect_conflicts` to have actually run (non-zero node latency), not merely zero conflicts found.
+  - Citation integrity. Every inline `[N]` and structured citation must fall in 1..`chunks.length`.
+- **Endpoint:** the suite uses non-streaming `POST /query`, not `/query/stream`. The stream's `done` event carries no `cost_usd` or `failure_mode`, so only `/query` gives exact per-run cost.
+- **Summary:** pass rate, abstention accuracy, p50/p95 latency, total cost and tokens. Errored cases are excluded from latency.
+
+### Trade-offs
+- **Gain:** a regression check anyone can run from the browser in one click, with exact cost. It catches the failures that matter for trust: broken citations, a guardrail that stopped refusing, a conflict gate that silently turned off.
+- **Lose:** 9 cases is a smoke test, not a benchmark. It says nothing about faithfulness or retrieval quality. Those stay with RAGAS and the ablations. **This complements the offline evals; it doesn't replace them.**
+- **Lose:** pass/fail is heuristic (abstention is detected from the `INSUFFICIENT EVIDENCE` sentinel or `grounded=false`). Each run spends real API cost, and results aren't persisted to `evals/results/`.
+
+### Interview framing
+> "Offline evals told me the system was good once. The live suite tells me it's still behaving: it refuses what it should, cites only chunks that exist, and actually runs the conflict check. It's nine cases on purpose. It's a smoke alarm, not a benchmark."
+
+### Revisit trigger
+- Before relying on it for release decisions → persist each run (timestamped) for regression tracking, and grow the case set from the golden set.
+- The stream `done` event gains `cost_usd` → the suite could use the streaming path and measure TTFT too.
+
+---
+
+## DEC-023: Client telemetry in Bolt Database (Supabase Postgres) instead of a vendor SDK
+
+**Date:** 2026-10-15 · **Status:** Accepted
+
+### Context
+LangSmith and the backend JSONL logs see the pipeline, not the user. What a visitor actually experienced in the browser went unrecorded: time to first token, aborted queries, client-side crashes. The frontend was built on Bolt, which provides a Supabase Postgres database ("Bolt Database"), so a store already existed with no new vendor.
+
+### Options considered
+A. **A vendor RUM/analytics SDK** (Sentry, PostHog, Datadog RUM). Session replay, alerting and dashboards out of the box. It's another third-party script and account, and some of these capture more than needed, including inputs.
+B. **Log from the backend only.** It can't see TTFT as the browser renders it, client errors or cancellations.
+C. **Two insert-only Postgres tables plus one aggregate function** in the existing Bolt Database.
+
+### Decision
+Option C. The schema is in `frontend/supabase/migrations/`; the client is `frontend/src/lib/telemetry.ts`.
+- **`query_events`:** one row per query. Outcome (grounded / abstained / error / cancelled), mode (live / demo), routing path, TTFT, total latency, chunk count, tokens, and cost (non-streaming runs only).
+- **`client_errors`:** uncaught errors from the React error boundary, `window.onerror` and unhandled rejections.
+- **Privacy:** question text is never stored. Session IDs are random per tab.
+- **Security:**
+  - RLS allows `INSERT` only for `anon`/`authenticated`, and only if `created_at` is within the last minute. There's no `SELECT` policy.
+  - CHECK constraints bound every column: lengths, enums, and numeric ranges such as latency ≤ 600000 ms.
+- **Reads:** only through `telemetry_summary(window_hours)`.
+  - It's a `SECURITY DEFINER` function that returns aggregates over live-mode rows.
+  - The window is clamped to 1–720 hours, and `EXECUTE` is revoked from `PUBLIC` and granted to `anon`/`authenticated`.
+- **Optional:** telemetry is off unless `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set at build time.
+
+### Trade-offs
+- **Gain:** no new vendor, and no PII or question text leaves the browser. The browser can write but never read raw rows. The whole design fits in one reviewable SQL file.
+- **Lose:**
+  - No session replay, no alerting, no automatic error grouping or source maps. Someone has to look at the dashboard.
+  - **The anon insert path is spammable.** The anon key ships in the bundle, so anyone can insert rows. CHECK bounds and the one-minute timestamp window limit the size and shape of junk; they don't limit the volume. Rate limiting (an edge function or per-session caps) is future work.
+  - Telemetry depends on the Bolt-hosted project staying up. Inserts are fire-and-forget: a failed write logs a console warning and is dropped, so the app is unaffected but the data is lost.
+
+### Interview framing
+> "I needed to know what users actually experienced, not just what the pipeline did. Instead of dropping in a vendor SDK, I used two insert-only tables, with CHECK constraints on every column and a single SECURITY DEFINER function for reads. The browser can write but never read raw rows, and question text is never stored. The open hole is volume: the anon path is spammable. I said so, and rate limiting is the next step."
+
+### Revisit trigger
+- Junk or abusive inserts show up → add rate limiting in front of the insert path (edge function or per-session caps).
+- Real users and an on-call need → move errors to a vendor with alerting and source maps, and keep the privacy rule (no question text).
+
+---
+
 ## Format notes for future entries
 
 - Write these **as they happen**, not retroactively. Retroactive entries sound fake in interviews.
