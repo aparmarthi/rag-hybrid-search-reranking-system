@@ -18,3 +18,5 @@ artifacts/finetuned-biencoder/
 qdrant_storage/
 tests/
 scripts/
+# React frontend deploys separately (Vercel); not part of the API image
+frontend/

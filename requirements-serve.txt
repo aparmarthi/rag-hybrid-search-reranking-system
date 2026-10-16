@@ -30,6 +30,7 @@ fastembed==0.8.0          # BM25 sparse vectors for hybrid query (onnxruntime ~7
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 httpx==0.28.1
+psycopg[binary]==3.2.3   # telemetry + feedback store (Neon Postgres, DEC-024)
 
 # UI (separate Render service)
 streamlit==1.41.1

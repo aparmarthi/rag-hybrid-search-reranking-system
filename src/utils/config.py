@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     qdrant_url: str = Field("http://localhost:6333", description="Qdrant endpoint. Blank for local.")
     qdrant_api_key: SecretStr | None = Field(None, description="Qdrant Cloud key; None for local")
 
+    # ----- Application database (telemetry + feedback, DEC-024) -----
+    database_url: SecretStr | None = Field(None, description="Postgres URL (Neon pooled). None → telemetry off, feedback to JSONL")
+
     # ----- Observability -----
     langsmith_api_key: SecretStr = Field(..., description="LangSmith tracing")
     langsmith_tracing: bool = Field(True)

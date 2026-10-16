@@ -55,10 +55,10 @@ flowchart LR
     RR --> C["Cohere Rerank 3.5"]
     QU & RT & DC & GE --> L["Claude<br/>via OpenRouter or Anthropic"]
 
-    B -.->|"telemetry, insert-only<br/>(optional)"| T[("Bolt Database<br/>query_events · client_errors")]
+    A -.->|"telemetry + feedback<br/>(rate-limited)"| T[("Neon Postgres<br/>query_events · client_errors · feedback")]
 ```
 
-The browser calls the API directly (CORS). The only other thing it talks to is the optional telemetry store, which never sees question text. Streamlit calls the API server-side. Full architecture diagram in `docs/architecture.md`.
+The browser calls the API directly (CORS) and talks to nothing else. Telemetry and feedback go through the API into Postgres; telemetry never stores question text. Streamlit calls the API server-side. Full architecture diagram in `docs/architecture.md`.
 
 ---
 
@@ -78,7 +78,7 @@ The browser calls the API directly (CORS). The only other thing it talks to is t
 - **Architecture:** the pipeline flow, key decisions (DEC-xxx summaries), the stack and links to resources.
 - **Evaluation:**
   - **Live behavioral suite:** 9 cases with a citation-integrity check, run against the live API from the browser ([below](#b-live-behavioral-suite-frontend), [DEC-022](docs/decisions.md#dec-022-live-behavioral-eval-in-the-ui--9-cases--citation-integrity-via-non-streaming-query)).
-  - **Production telemetry panel:** aggregates from real frontend traffic ([Observability](#observability), [DEC-023](docs/decisions.md#dec-023-client-telemetry-in-bolt-database-supabase-postgres-instead-of-a-vendor-sdk)).
+  - **Production telemetry panel:** aggregates from real frontend traffic ([Observability](#observability), [DEC-024](docs/decisions.md#dec-024-telemetry-and-feedback-through-fastapi-into-neon-postgres-supersedes-dec-023)).
   - **Offline benchmark:** the same numbers as [Evaluation](#evaluation) below, mirrored in `frontend/src/lib/project-facts.ts`.
 
 <!-- TODO: add a screenshot or GIF of the Ask page (answer + evidence panel + pipeline trace). No image is committed yet. -->
@@ -111,7 +111,7 @@ The frontend isn't deployed to a public URL yet. Run it locally ([Quickstart](#r
 | Frontend | React 18 + Vite + TypeScript | Static build, any static host; talks to the API directly over CORS |
 | Frontend UI | Tailwind CSS + shadcn/ui (Radix) · Recharts | Accessible primitives; latency and telemetry charts |
 | Frontend tests | Vitest | 27 unit tests on the SSE parser, citation helpers and eval scoring |
-| Client telemetry | Bolt Database (Supabase Postgres), telemetry only | Insert-only RLS tables + one aggregate function; no vendor SDK (DEC-023) |
+| App database | Neon Postgres (serverless), via FastAPI + psycopg | Telemetry + feedback; the browser never holds a DB credential; scales to zero (DEC-024) |
 | Deployment | Cloud Run (min-instances=1) + Secret Manager + Qdrant Cloud | Always-on live URL, no cold start (DEC-019) |
 | CI/CD | GitHub Actions | `ci`: ruff + serve-import guard + backend unit tests. `frontend-ci`: typecheck + Vitest + build. Both run on every push/PR to `main`. The RAGAS faithfulness gate runs manually before deploy (needs keys, spends tokens) |
 
@@ -213,9 +213,9 @@ This layer catches regressions that a one-off offline score can't: a prompt chan
 **Backend:**
 - **LangSmith:** per-node traces of the LangGraph pipeline. On whenever `LANGSMITH_API_KEY` is set (`LANGSMITH_TRACING` defaults to true).
 - **W&B Weave:** `@op` on all 6 graph nodes, the same spans re-expressed in Weave. Off unless `WEAVE_ENABLED` is set; not enabled on the Cloud Run deploy ([DEC-017](docs/decisions.md#dec-017-built-the-deferred-two-tower-fine-tune--re-expressed-observability-in-wb-weave)).
-- **Per-query logs:** a cost estimate (`cost_tracker`) and a 5-mode failure classification (`failure_tracker`), returned on `/query` and logged to JSONL. `/feedback` records thumbs up/down.
+- **Per-query logs:** a cost estimate (`cost_tracker`) and a 5-mode failure classification (`failure_tracker`), returned on `/query` and logged to JSONL. `/feedback` records thumbs up/down (Postgres when `DATABASE_URL` is set, else `logs/feedback.jsonl`).
 
-**Frontend telemetry** (optional; on only when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set at build time):
+**Frontend telemetry** (browser → `POST /telemetry/query` · `POST /telemetry/error` → Postgres; on when the API has `DATABASE_URL`, else those endpoints return 503):
 - **Per query** (`query_events`):
   - outcome (grounded / abstained / error / cancelled)
   - time to first token and total latency
@@ -224,10 +224,11 @@ This layer catches regressions that a one-off offline score can't: a prompt chan
 - **Uncaught client errors** (`client_errors`): the React error boundary, `window.onerror` and unhandled promise rejections.
 - **Privacy:** question text is never stored. Session IDs are random per browser tab.
 - **Security:**
-  - Both tables are insert-only for the browser. RLS has no SELECT policy, and every insert must be stamped within the last minute.
-  - CHECK constraints bound every field (lengths, enums, numeric ranges).
-  - The dashboard reads only through `telemetry_summary(window_hours)`, a `SECURITY DEFINER` function that returns aggregates over live-mode traffic. The window is clamped to 1–720 hours.
-- **Schema:** `frontend/supabase/migrations/`. Design and trade-offs are in [DEC-023](docs/decisions.md#dec-023-client-telemetry-in-bolt-database-supabase-postgres-instead-of-a-vendor-sdk).
+  - The browser writes only through the API and holds no database credential. Only the API connects to Postgres.
+  - Pydantic bounds mirror the CHECK constraints on every column (lengths, enums, numeric ranges); out-of-bounds input is a 422.
+  - Writes (including `/feedback`) are rate-limited to 30 per minute per client IP (429 beyond that).
+  - The dashboard reads only `GET /telemetry/summary?window_hours=` (1–720), which returns aggregates over live-mode traffic. Raw rows have no read endpoint.
+- **Schema:** `src/telemetry/schema.sql`, applied with `python -m scripts.init_db`. Design and trade-offs are in [DEC-024](docs/decisions.md#dec-024-telemetry-and-feedback-through-fastapi-into-neon-postgres-supersedes-dec-023) (supersedes [DEC-023](docs/decisions.md#dec-023-client-telemetry-in-bolt-database-supabase-postgres-instead-of-a-vendor-sdk)).
 
 ---
 
@@ -235,7 +236,7 @@ This layer catches regressions that a one-off offline score can't: a prompt chan
 
 | Suite | Count | What it covers | Workflow |
 |---|---|---|---|
-| Backend unit tests (`tests/test_unit.py`, `tests/test_week4.py`) | 29 | Chunker, `[N]` citation parsing, conflict-detector gates, temporal staleness, cost tracker (incl. OpenRouter model ids), failure-mode classifier, `/feedback` validation, 503 / SSE `error` degradation on LLM-provider failure and on a missing key | `ci` (`.github/workflows/ci.yml`): ruff → serve-import guard → pytest. No API calls (dummy keys) |
+| Backend unit tests (`tests/test_unit.py`, `tests/test_week4.py`, `tests/test_telemetry.py`) | 37 | Chunker, `[N]` citation parsing, conflict-detector gates, temporal staleness, cost tracker (incl. OpenRouter model ids), failure-mode classifier, `/feedback` validation, 503 / SSE `error` degradation on LLM-provider failure and on a missing key, telemetry bounds / per-IP rate limit / 503-when-unconfigured and feedback-to-Postgres (store monkeypatched, no DB) | `ci` (`.github/workflows/ci.yml`): ruff → serve-import guard → pytest. No API calls (dummy keys) |
 | Frontend unit tests (`frontend/src/lib/*.test.ts`) | 27 | **SSE parser** (`api.test.ts`, 7): events split across network chunks, CRLF line endings, a final event with no trailing blank line, server `error` events, malformed payloads, the stream ending before `done`, HTTP error detail. **Citation helpers** (`evidence.test.ts`, 13): grouped markers, `[N]` → `chunks[N-1]` without re-sorting, out-of-range citations, abstention detection, formatting. **Eval scoring** (`eval-suite.test.ts`, 7): citation integrity, abstention, the conflict-node requirement, summary aggregation, and coverage of every example question | `frontend-ci` (`.github/workflows/frontend-ci.yml`): `npm ci` → typecheck → test → build on Node 20. Path-filtered to `frontend/**` and the workflow file |
 | RAGAS faithfulness gate | n=40 | Faithfulness against the 0.80 target | Manual, pre-deploy (`python -m src.evaluation.ragas_runner`). Needs API keys and spends tokens, so it's not in CI |
 
@@ -355,7 +356,7 @@ npm ci
 npm run dev            # Vite dev server
 ```
 - `VITE_API_URL` blank → the deployed Cloud Run API. Set `http://localhost:8000` to use a local API. You can also override it at runtime from the Settings popover.
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` blank → telemetry off.
+- Telemetry goes to whichever API the app is pointed at; a local API without `DATABASE_URL` returns 503 for it, which the app ignores.
 - The API allows every origin by default (`CORS_ALLOW_ORIGINS` unset → `*`), so localhost works against either API.
 - Never commit `frontend/.env`.
 
@@ -366,11 +367,12 @@ Keys live in Secret Manager (`finsight-*`), readable only by the `finsight-run` 
 gcloud builds submit --tag us-central1-docker.pkg.dev/finsight-gpu/finsight/finsight:$(git rev-parse --short HEAD)
 gcloud run deploy finsight-api --image <tag> --port 8000 --memory 1Gi --min-instances 1 \
   --service-account finsight-run@finsight-gpu.iam.gserviceaccount.com \
-  --set-env-vars LLM_GATEWAY=openrouter,... --set-secrets OPENROUTER_API_KEY=finsight-openrouter-api-key:latest,...
+  --set-env-vars LLM_GATEWAY=openrouter,... --set-secrets OPENROUTER_API_KEY=finsight-openrouter-api-key:latest,DATABASE_URL=finsight-database-url:latest,...
 gcloud run deploy finsight-ui --image <tag> --port 8080 --min-instances 1 --session-affinity \
   --command streamlit --args run,ui/streamlit_app.py,--server.port=8080,--server.address=0.0.0.0 \
   --set-env-vars API_URL=<finsight-api url>
 ```
+Traffic must follow the latest revision. If it was ever pinned to a named revision, a deploy creates a healthy new revision that gets 0% traffic, while gcloud reports the pinned one as "serving 100 percent". Check with `gcloud run services describe finsight-api --region us-central1 --format="yaml(status.traffic)"` and fix with `gcloud run services update-traffic finsight-api --region us-central1 --to-latest`.
 The Render backup still deploys from `render.yaml` with secrets as dashboard env vars.
 Before deploying, verify the trimmed runtime has every dependency the serve path imports:
 ```bash
@@ -385,7 +387,6 @@ npm ci && npm run build   # outputs frontend/dist/
 ```
 - **Build-time env vars** (from `frontend/.env.example`). Vite inlines `VITE_*` at build time, so set them in the host's build settings, not at runtime:
   - `VITE_API_URL`: API base URL. Blank → the deployed Cloud Run API.
-  - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`: optional telemetry. The anon key is public by design; the RLS policies are what protect the tables.
 - **CORS:** the API reads `CORS_ALLOW_ORIGINS` (comma-separated). It's unset on Cloud Run today, which means `*`, so a new frontend origin works without changes. To lock it down to the deployed frontend:
   ```bash
   gcloud run services update finsight-api --region us-central1 \
@@ -421,13 +422,12 @@ finsight/
 │   ├── recommendations/     # Shared-embedding related-tickers (Week 4)
 │   ├── evaluation/          # RAGAS + ablations + LLM comparison (Week 3)
 │   └── utils/               # Config, logging
-├── api/                     # FastAPI: /health, /query, /query/stream, /recommend/{ticker}, /feedback
+├── api/                     # FastAPI: /health, /query, /query/stream, /recommend/{ticker}, /feedback, /telemetry/*
 ├── ui/                      # Streamlit demo (5 tabs)
 ├── frontend/                # React + Vite evidence UI (Ask · Architecture · Evaluation)
 │   ├── src/lib/             # API client + SSE parser, citation helpers, eval suite, telemetry, project facts (+ Vitest tests)
 │   ├── src/components/      # finsight/ feature components + shadcn/ui primitives
-│   ├── supabase/migrations/ # Telemetry schema: insert-only RLS tables + telemetry_summary()
-│   └── .env.example         # VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (all optional)
+│   └── .env.example         # VITE_API_URL (optional)
 ├── tests/                   # Backend pytest suite (unit + Week-4 API/degradation tests)
 ├── .github/workflows/
 │   ├── ci.yml               # ruff + serve-import guard + backend unit tests
@@ -436,7 +436,7 @@ finsight/
 ├── docs/
 │   ├── PRD.md               # Problem, users, metrics, trade-offs, ROI
 │   ├── architecture.md      # Diagrams, state schema, module boundaries (✅/🔷 marked)
-│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…023)
+│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…024)
 │   ├── deployment-playbook.md   # How I'd deploy this at a regulated customer (FDE artifact)
 │   ├── interview-positioning.md # Role → question → artifact map
 │   └── finsight_spec_v2.3.md  # Canonical spec
@@ -457,7 +457,7 @@ finsight/
 - **Week 3** — ✅ Evidence conflict detector (precision-gated), 50-query golden set, retrieval ablation (**hybrid+rerank +27.4% NDCG** vs dense), RAGAS faithfulness (**0.806**, passes 0.80 gate), chunking ablation, 12 unit tests, lightweight CI (lint + import-guard + tests). 🔷 Skipped by choice: Claude-vs-GPT LLM bake-off (stale target), MLflow (one-shot ablations → git-versioned JSON instead).
 - **Week 4** — ✅ Related-tickers recs (shared-embedding NN), per-query cost tracker, 5-mode failure logger, `/recommend` + `/feedback` endpoints, 5-tab Streamlit demo. 🔷 Remaining: live load-test run (P95, token-budget-gated), multi-turn context (deferred — low ROI on tab UI).
 - **Week 5** — 🔷 Pending: demo Loom video, blog post, LinkedIn Featured *(your distribution work)*.
-- **Frontend** — ✅ React evidence UI (`frontend/`): streaming answers with 1:1 `[N]` → chunk citations, per-node pipeline trace, conflict and abstention states, labeled demo-mode fallback. ✅ Live 9-case behavioral eval with citation integrity on the Evaluation page. ✅ Client telemetry (insert-only Bolt Database tables + aggregate dashboard). ✅ `frontend-ci` (typecheck + 27 Vitest tests + build). See [DEC-020…023](docs/decisions.md#dec-020-citation-index-invariant--n-is-chunksn-1-never-re-sorted-client-side). 🔷 Remaining: public hosting for the frontend.
+- **Frontend** — ✅ React evidence UI (`frontend/`): streaming answers with 1:1 `[N]` → chunk citations, per-node pipeline trace, conflict and abstention states, labeled demo-mode fallback. ✅ Live 9-case behavioral eval with citation integrity on the Evaluation page. ✅ Client telemetry + feedback through the API into Neon Postgres, rate-limited, with an aggregate dashboard (DEC-024). ✅ `frontend-ci` (typecheck + 27 Vitest tests + build). See [DEC-020…023](docs/decisions.md#dec-020-citation-index-invariant--n-is-chunksn-1-never-re-sorted-client-side). 🔷 Remaining: public hosting for the frontend.
 - **Bonus (training + observability)** — ✅ Two-tower bi-encoder fine-tune (`sentence-transformers`, in-batch-negative contrastive loss) on leakage-guarded domain pairs: **Recall@5 0.825 → 0.870 (+4.5 pts mean, range +2.5 to +5.0 across 5 seeds; positive on all 5)** on 40 held-out golden queries vs a 3000-chunk pool ([evals/results/finetune_seeds/](evals/results/finetune_seeds/), runs on [W&B](https://wandb.ai/ameyparmarthi-finsight/finsight-biencoder-finetune)). Plus **W&B Weave** tracing (`@op` on all 6 nodes) alongside LangSmith. See [DEC-017](docs/decisions.md).
 
 Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this project maps to specific roles — and how I'd deploy it at a real customer — is in [docs/interview-positioning.md](docs/interview-positioning.md) and [docs/deployment-playbook.md](docs/deployment-playbook.md).

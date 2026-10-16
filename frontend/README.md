@@ -45,18 +45,18 @@ src/
     demo.ts           captured responses for demo mode
   hooks/              query runner, eval runner, API health, history, theme
   components/finsight/  page and panel components
-supabase/migrations/  telemetry schema
 ```
 
 ## Telemetry
 
-When `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set, the app records, per live query, outcome
+The app posts to the API's `/telemetry/query` and `/telemetry/error` (stored in Postgres, DEC-024). Per live query it records outcome
 (grounded / abstained / error / cancelled), routing path, time to first token, total latency, chunk count,
 tokens and cost. Uncaught errors (React error boundary, `window.onerror`, unhandled rejections) are also recorded.
 
 - **Privacy:** question text and personal data are never stored. Session IDs are random per tab.
-- **Security:** both tables are insert-only for the browser (RLS, no SELECT policy), with CHECK constraints
-  bounding every field. The dashboard reads through `telemetry_summary()`, which returns aggregates only.
+- **Security:** the browser holds no database credential. The API validates every field (Pydantic bounds that
+  mirror the schema's CHECK constraints) and rate-limits writes per IP. The dashboard reads
+  `GET /telemetry/summary`, which returns aggregates only.
 - Demo-mode traffic is recorded but excluded from the summary.
 
 ## Deploy

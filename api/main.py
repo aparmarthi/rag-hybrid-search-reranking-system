@@ -19,14 +19,18 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 
 import anthropic
-from fastapi import FastAPI, HTTPException
+import psycopg
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.telemetry import rate_limit
+from api.telemetry import router as telemetry_router
 from src.generation.generator import Generator
 from src.indexing.qdrant_client import collection_stats, get_client
 from src.retrieval.retriever import Retriever
+from src.telemetry import store
 from src.utils.config import settings
 from src.utils.llm_client import LLMConfigError, llm_key_configured
 from src.utils.logging import get_logger
@@ -67,6 +71,7 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+app.include_router(telemetry_router)
 
 
 # ----- Schemas -----
@@ -314,21 +319,24 @@ class FeedbackRequest(BaseModel):
     note: str = ""
 
 
-@app.post("/feedback")
+@app.post("/feedback", dependencies=[Depends(rate_limit)])
 def feedback(req: FeedbackRequest) -> dict:
-    """Log a thumbs up/down on an answer to logs/feedback.jsonl."""
+    """Record a thumbs up/down on an answer: Postgres when DATABASE_URL is set (DEC-024),
+    else logs/feedback.jsonl (local dev; ephemeral on Cloud Run)."""
     import json as _json
     from datetime import datetime, timezone
 
+    rec = {"question": req.question[:300], "answer": req.answer[:300], "rating": req.rating, "note": req.note[:300]}
+    if store.enabled():
+        try:
+            store.insert("feedback", rec)
+        except psycopg.Error as e:
+            log.error("feedback write failed: %s", type(e).__name__)
+            raise HTTPException(status_code=503, detail="Feedback storage is temporarily unavailable.") from e
+        return {"status": "recorded", "rating": req.rating}
+
     path = settings.repo_root / "logs" / "feedback.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    rec = {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "question": req.question[:300],
-        "answer": req.answer[:300],
-        "rating": req.rating,
-        "note": req.note[:300],
-    }
     with open(path, "a") as f:
-        f.write(_json.dumps(rec) + "\n")
+        f.write(_json.dumps({"ts": datetime.now(timezone.utc).isoformat(), **rec}) + "\n")
     return {"status": "recorded", "rating": req.rating}

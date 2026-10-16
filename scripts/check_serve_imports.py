@@ -22,6 +22,7 @@ import sys
 # Every module the deployed API imports at import-time or request-time.
 SERVE_MODULES = [
     "api.main",
+    "src.telemetry.store",          # psycopg (DEC-024)
     "src.retrieval.graph",          # LangGraph pipeline (pulls langgraph, langchain-core)
     "src.retrieval.nodes",
     "src.retrieval.retriever",      # qdrant-client, fastembed (BM25)
