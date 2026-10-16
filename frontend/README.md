@@ -68,3 +68,5 @@ npm run build   # outputs dist/
 ```
 
 The API must allow the frontend origin via CORS.
+
+Live: Vercel (Root Directory `frontend`) at https://finsight.ameyparmarthi.com (DEC-025). The API's CORS allowlist is that origin plus `http://localhost:5173`, so Vercel preview URLs run in demo mode. If the live site shows demo mode on a VPN, check whether the VPN's DNS resolves `*.run.app` to a private `100.64.x.x` address. Chrome blocks those calls from a public page.

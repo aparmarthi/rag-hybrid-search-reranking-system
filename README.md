@@ -11,7 +11,8 @@
 - **Backend** (`api/`, `src/`): FastAPI on Cloud Run running the 6-node LangGraph pipeline over Qdrant Cloud, Cohere Rerank and Claude. Serves the Streamlit demo below and the React frontend.
 - **Frontend** (`frontend/`): a React + Vite evidence UI. It streams answers, maps every `[N]` citation to its evidence chunk, shows the per-node pipeline trace, and runs a live behavioral eval suite against the API. See [Frontend](#frontend).
 
-**Live demo:** https://finsight-ui-995576020018.us-central1.run.app — ask about 2019–2023 earnings calls; get a streamed, cited answer. *(Google Cloud Run, always on — no cold start.)*
+**Live demo:** https://finsight.ameyparmarthi.com — ask about 2019–2023 earnings calls; get a streamed, cited answer, the evidence behind every `[N]`, and the per-node pipeline trace. *(React UI on Vercel → API on Google Cloud Run, always on — no cold start. DEC-025.)*
+**Streamlit demo:** https://finsight-ui-995576020018.us-central1.run.app *(the original UI, same API)*
 **API:** https://finsight-api-995576020018.us-central1.run.app/docs (FastAPI · `/query`, `/query/stream`, `/recommend`, `/feedback`, `/health`)
 *Backup (Render free tier, ~50s cold start after idle):* [UI](https://finsight-ui-z0mp.onrender.com) · [API](https://finsight-api-otsr.onrender.com/docs)
 **Measured:** hybrid+rerank beats dense-only by **+27% NDCG@10**; RAGAS faithfulness **0.81** (n=40 golden set). See [Evaluation](#evaluation).
@@ -81,10 +82,10 @@ The browser calls the API directly (CORS) and talks to nothing else. Telemetry a
   - **Production telemetry panel:** aggregates from real frontend traffic ([Observability](#observability), [DEC-024](docs/decisions.md#dec-024-telemetry-and-feedback-through-fastapi-into-neon-postgres-supersedes-dec-023)).
   - **Offline benchmark:** the same numbers as [Evaluation](#evaluation) below, mirrored in `frontend/src/lib/project-facts.ts`.
 
-<!-- TODO: add a screenshot or GIF of the Ask page (answer + evidence panel + pipeline trace). No image is committed yet. -->
-*Screenshot: TODO.*
+![FinSight Ask page: grounded answer with inline citations and the evidence panel](docs/assets/ask-page.png)
+*The live Ask page (2026-10-16): a grounded answer whose `[N]` markers map to the evidence cards on the right.*
 
-The frontend isn't deployed to a public URL yet. Run it locally ([Quickstart](#run-the-frontend)) or see [Deploy the frontend](#deploy-the-frontend-static). Details are in [frontend/README.md](frontend/README.md).
+Live at https://finsight.ameyparmarthi.com ([DEC-025](docs/decisions.md#dec-025-react-frontend-on-vercel-calling-the-cloud-run-api-directly)). Run it locally ([Quickstart](#run-the-frontend)) or see [Deploy the frontend](#deploy-the-frontend-static). Details are in [frontend/README.md](frontend/README.md).
 
 ---
 
@@ -108,7 +109,7 @@ The frontend isn't deployed to a public URL yet. Run it locally ([Quickstart](#r
 | Observability | LangSmith + W&B Weave | Per-node traces; Weave `@op` on all 6 nodes, opt-in via `WEAVE_ENABLED` (DEC-017). MLflow was scoped out (DEC-016) |
 | Serving | FastAPI (async) | Async handlers, Pydantic validation, connection pooling |
 | Demo UI | Streamlit | Free public URL, 5-tab multi-scenario |
-| Frontend | React 18 + Vite + TypeScript | Static build, any static host; talks to the API directly over CORS |
+| Frontend | React 18 + Vite + TypeScript, hosted on Vercel | Static build; talks to the API directly over CORS (DEC-025) |
 | Frontend UI | Tailwind CSS + shadcn/ui (Radix) · Recharts | Accessible primitives; latency and telemetry charts |
 | Frontend tests | Vitest | 27 unit tests on the SSE parser, citation helpers and eval scoring |
 | App database | Neon Postgres (serverless), via FastAPI + psycopg | Telemetry + feedback; the browser never holds a DB credential; scales to zero (DEC-024) |
@@ -381,13 +382,15 @@ python -m scripts.check_serve_imports   # guards against requirements-serve.txt 
 
 ### Deploy the frontend (static)
 The frontend is a static bundle, so any static host works: Vercel, Netlify, or Cloud Storage + Cloud CDN. Navigation is in-app state and deep links use `?q=`, so no SPA rewrite rules are needed.
+
+**Live setup (DEC-025):** a Vercel project with Root Directory `frontend`. Pushes to `main` deploy to production, and each PR gets a preview URL. The domain is a `finsight` CNAME → `cname.vercel-dns.com` at the registrar.
 ```bash
 cd frontend
 npm ci && npm run build   # outputs frontend/dist/
 ```
 - **Build-time env vars** (from `frontend/.env.example`). Vite inlines `VITE_*` at build time, so set them in the host's build settings, not at runtime:
   - `VITE_API_URL`: API base URL. Blank → the deployed Cloud Run API.
-- **CORS:** the API reads `CORS_ALLOW_ORIGINS` (comma-separated). It's unset on Cloud Run today, which means `*`, so a new frontend origin works without changes. To lock it down to the deployed frontend:
+- **CORS:** the API reads `CORS_ALLOW_ORIGINS` (comma-separated; unset means `*`). Since 2026-10-16 Cloud Run allows only `https://finsight.ameyparmarthi.com,http://localhost:5173`, so Vercel preview URLs fall back to demo mode. To set or change it:
   ```bash
   gcloud run services update finsight-api --region us-central1 \
     --update-env-vars CORS_ALLOW_ORIGINS=https://<frontend-origin>
@@ -436,7 +439,7 @@ finsight/
 ├── docs/
 │   ├── PRD.md               # Problem, users, metrics, trade-offs, ROI
 │   ├── architecture.md      # Diagrams, state schema, module boundaries (✅/🔷 marked)
-│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…024)
+│   ├── decisions.md         # Engineering war stories — interview artifact (DEC-001…025)
 │   ├── deployment-playbook.md   # How I'd deploy this at a regulated customer (FDE artifact)
 │   ├── interview-positioning.md # Role → question → artifact map
 │   └── finsight_spec_v2.3.md  # Canonical spec
@@ -457,7 +460,7 @@ finsight/
 - **Week 3** — ✅ Evidence conflict detector (precision-gated), 50-query golden set, retrieval ablation (**hybrid+rerank +27.4% NDCG** vs dense), RAGAS faithfulness (**0.806**, passes 0.80 gate), chunking ablation, 12 unit tests, lightweight CI (lint + import-guard + tests). 🔷 Skipped by choice: Claude-vs-GPT LLM bake-off (stale target), MLflow (one-shot ablations → git-versioned JSON instead).
 - **Week 4** — ✅ Related-tickers recs (shared-embedding NN), per-query cost tracker, 5-mode failure logger, `/recommend` + `/feedback` endpoints, 5-tab Streamlit demo. 🔷 Remaining: live load-test run (P95, token-budget-gated), multi-turn context (deferred — low ROI on tab UI).
 - **Week 5** — 🔷 Pending: demo Loom video, blog post, LinkedIn Featured *(your distribution work)*.
-- **Frontend** — ✅ React evidence UI (`frontend/`): streaming answers with 1:1 `[N]` → chunk citations, per-node pipeline trace, conflict and abstention states, labeled demo-mode fallback. ✅ Live 9-case behavioral eval with citation integrity on the Evaluation page. ✅ Client telemetry + feedback through the API into Neon Postgres, rate-limited, with an aggregate dashboard (DEC-024). ✅ `frontend-ci` (typecheck + 27 Vitest tests + build). See [DEC-020…023](docs/decisions.md#dec-020-citation-index-invariant--n-is-chunksn-1-never-re-sorted-client-side). 🔷 Remaining: public hosting for the frontend.
+- **Frontend** — ✅ React evidence UI (`frontend/`): streaming answers with 1:1 `[N]` → chunk citations, per-node pipeline trace, conflict and abstention states, labeled demo-mode fallback. ✅ Live 9-case behavioral eval with citation integrity on the Evaluation page. ✅ Client telemetry + feedback through the API into Neon Postgres, rate-limited, with an aggregate dashboard (DEC-024). ✅ `frontend-ci` (typecheck + 27 Vitest tests + build). See [DEC-020…023](docs/decisions.md#dec-020-citation-index-invariant--n-is-chunksn-1-never-re-sorted-client-side). ✅ Hosted on Vercel at finsight.ameyparmarthi.com, with CORS locked to it (DEC-025).
 - **Bonus (training + observability)** — ✅ Two-tower bi-encoder fine-tune (`sentence-transformers`, in-batch-negative contrastive loss) on leakage-guarded domain pairs: **Recall@5 0.825 → 0.870 (+4.5 pts mean, range +2.5 to +5.0 across 5 seeds; positive on all 5)** on 40 held-out golden queries vs a 3000-chunk pool ([evals/results/finetune_seeds/](evals/results/finetune_seeds/), runs on [W&B](https://wandb.ai/ameyparmarthi-finsight/finsight-biencoder-finetune)). Plus **W&B Weave** tracing (`@op` on all 6 nodes) alongside LangSmith. See [DEC-017](docs/decisions.md).
 
 Full plan: [docs/finsight_spec_v2.3.md](docs/finsight_spec_v2.3.md). How this project maps to specific roles — and how I'd deploy it at a real customer — is in [docs/interview-positioning.md](docs/interview-positioning.md) and [docs/deployment-playbook.md](docs/deployment-playbook.md).

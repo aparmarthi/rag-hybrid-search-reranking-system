@@ -179,7 +179,7 @@ Full version will live in `docs/product_strategy.md` (written in Week 5 as part 
 
 ## 14. Related interview artifacts
 
-- [decisions.md](decisions.md) — engineering war stories (DEC-001 … DEC-024).
+- [decisions.md](decisions.md) — engineering war stories (DEC-001 … DEC-025).
 - [deployment-playbook.md](deployment-playbook.md) — how FinSight would be deployed at a regulated customer (the forward-deployed-engineer artifact).
 - [interview-positioning.md](interview-positioning.md) — how this project maps to the target role band (FDE / SA / Director / TPM / AI PM) and the trustworthy-AI framing.
 

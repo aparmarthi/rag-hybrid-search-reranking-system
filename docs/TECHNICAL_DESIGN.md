@@ -191,8 +191,8 @@ real number + reason was reported instead.
 → external APIs (Claude via OpenRouter or Anthropic, Voyage, Cohere, LangSmith).
 Secrets in Secret Manager under a dedicated service account (never committed). The
 Render free-tier services remain as a backup. The React frontend (`frontend/`) is a
-static build for any static host; it needs only its origin allowed by the API's
-`CORS_ALLOW_ORIGINS` (default `*`).
+static build served from Vercel at `finsight.ameyparmarthi.com` (DEC-025). It calls the
+API directly, and the API's `CORS_ALLOW_ORIGINS` allows only that origin plus localhost.
 
 **Self-contained serve:** `EMBEDDING_BACKEND=voyage` (no local model) +
 `USE_DUCKDB_HYDRATION=false` (full text from Qdrant payload) → the app is a pure API
