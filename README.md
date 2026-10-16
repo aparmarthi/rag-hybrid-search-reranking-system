@@ -372,6 +372,7 @@ gcloud run deploy finsight-ui --image <tag> --port 8080 --min-instances 1 --sess
   --command streamlit --args run,ui/streamlit_app.py,--server.port=8080,--server.address=0.0.0.0 \
   --set-env-vars API_URL=<finsight-api url>
 ```
+Traffic must follow the latest revision. If it was ever pinned to a named revision, a deploy creates a healthy new revision that gets 0% traffic, while gcloud reports the pinned one as "serving 100 percent". Check with `gcloud run services describe finsight-api --region us-central1 --format="yaml(status.traffic)"` and fix with `gcloud run services update-traffic finsight-api --region us-central1 --to-latest`.
 The Render backup still deploys from `render.yaml` with secrets as dashboard env vars.
 Before deploying, verify the trimmed runtime has every dependency the serve path imports:
 ```bash
