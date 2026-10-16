@@ -24,7 +24,7 @@
 
 Equity analysts spend 3–4 hours per research report cross-referencing three disconnected sources: what management said on the earnings call, what the filing actually disclosed, and how the market reacted. When those sources disagree — Q2 guidance vs Q3 guidance, transcript revenue vs 10-Q revenue — today's workflow has no systematic way to surface the conflict.
 
-FinSight retrieves across all three sources simultaneously, grounds every answer in cited sources, and flags when sources disagree. That last part — **evidence conflict detection** — turns this from a Q&A tool into a research product, and into a system that surfaces contradictions instead of confidently averaging them.
+FinSight is designed to retrieve across all three sources at once (live today: transcripts; SEC and price data are ingested but not yet on the retrieval paths), grounds every answer in cited sources, and flags when sources disagree. That last part — **evidence conflict detection** — turns this from a Q&A tool into a research product, and into a system that surfaces contradictions instead of confidently averaging them.
 
 ### Business value
 
@@ -127,7 +127,7 @@ Live at https://finsight.ameyparmarthi.com ([DEC-025](docs/decisions.md#dec-025-
 | Earnings call transcripts (text) | [Motley Fool scraped transcripts (Kaggle: tpotterer)](https://www.kaggle.com/datasets/tpotterer/motley-fool-scraped-earnings-call-transcripts) | `earnings_analysis` retrieval corpus. Conflict detector Source A |
 | SEC filings (structured + risk text) | [SEC Financial Statement Data Sets (EDGAR XBRL)](https://www.sec.gov/data-research/sec-markets-data/financial-statement-data-sets) | `financial_metrics` (DuckDB fundamentals, conflict detector Source B) + `risk_and_events` (10-K Item 1A risk factors, 8-K events) |
 | OHLCV prices (time-series) | [Jackson Crow stock market dataset (Kaggle)](https://www.kaggle.com/datasets/jacksoncrow/stock-market-dataset) | Node 4 universal context — event-window price moves for any path. Not its own router path (see decisions.md DEC-004) |
-| Golden eval | Hand-curated | 50 queries + 20+20 conflict pairs + 5 adversarial + 5 abstention |
+| Golden eval | Hand-curated | 50 queries (`evals/golden_queries.jsonl`): 40 grounded + 5 adversarial + 5 abstention. Labeled conflict pairs are future work (DEC-007) |
 
 **Router paths:** `earnings_analysis` · `financial_metrics` · `risk_and_events`. The earlier `price_action` and `news_sentiment` paths were retired — OHLCV became universal Node-4 context and the Reddit-sourced news dataset was the wrong granularity (full rationale in [docs/decisions.md](docs/decisions.md) DEC-004).
 
