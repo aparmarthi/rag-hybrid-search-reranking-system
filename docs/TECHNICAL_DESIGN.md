@@ -1,9 +1,9 @@
 # FinSight — Technical Design Document
 
 **System:** FinSight — a production RAG system for investor-grade financial research.
-**Status:** Weeks 1–4 complete; live on Render + Qdrant Cloud.
+**Status:** Weeks 1–4 complete + React frontend; live on Google Cloud Run (always on, DEC-019) + Qdrant Cloud; Render kept as a backup.
 **Companion docs:** [architecture.md](architecture.md) (diagrams), [CODE_WALKTHROUGH.md](CODE_WALKTHROUGH.md)
-(reading order), [decisions.md](decisions.md) (decision log DEC-001…016), [PRD.md](PRD.md) (product).
+(reading order), [decisions.md](decisions.md) (decision log DEC-001…023), [PRD.md](PRD.md) (product).
 
 ---
 
@@ -123,9 +123,16 @@ expensive Sonnet only for reasoning (nodes 5–6). Measured per-node latency mak
 this concrete (Haiku ~700-900ms vs Sonnet generate ~5s).
 
 **Served by FastAPI** (`api/main.py`): `/query` (full pipeline), `/query/stream`
-(SSE token streaming, ~1.3s first token), `/recommend/{ticker}`, `/feedback`,
-`/health`. Lazy singletons + a `lifespan` warmup avoid cold-start on the first
-real query.
+(SSE token streaming; first token 4.3s end-to-end on the live deploy, DEC-018 —
+DEC-011's ~1.3s was a Week-1 figure from before the pre-generation nodes existed),
+`/recommend/{ticker}`, `/feedback`, `/health`. Lazy singletons + a `lifespan`
+warmup avoid cold-start on the first real query.
+
+**Clients:** the Streamlit demo (server-side) and the React frontend in
+`frontend/` (browser, over CORS; `CORS_ALLOW_ORIGINS`, default `*`). The frontend
+maps `[N]` to `chunks[N-1]` without re-sorting (DEC-020), falls back to a labeled
+demo mode when `/health` fails (DEC-021), and runs a 9-case live behavioral eval
+via `/query` (DEC-022).
 
 ---
 
@@ -140,10 +147,10 @@ the tradeoff.
 | **Embeddings** (DEC-003, 012) | voyage-finance-2 (API) + bge-m3 (local) | Domain-tuned + deploy-friendly (no model in the 512MB dyno). Fallback for offline/degraded. |
 | **Retrieval** (DEC-013) | Hybrid BM25+dense, native RRF | +27.4% NDCG vs dense-only (measured). One server-side call, no client merge. |
 | **Reranker** (DEC-006) | Cohere rerank-v3.5 + local ms-marco fallback | Managed quality, no GPU ops; graceful degradation on outage. |
-| **Citations** (DEC-011) | Inline [N] parsed post-hoc, NOT forced tool-use | Forced tool-use buffers the whole JSON → kills streaming (first token 11s→1.3s). Production-idiomatic (Perplexity-style). |
+| **Citations** (DEC-011) | Inline [N] parsed post-hoc, NOT forced tool-use | Forced tool-use buffers the whole JSON → kills streaming (first token 11s→1.3s, Week-1 generator path; live end-to-end TTFT is 4.3s, DEC-018). Production-idiomatic (Perplexity-style). |
 | **Conflict detector** (DEC-007) | Intra-transcript, precision-gated | Cross-source needs SEC XBRL (not ingested). Precision gates (period/subject/date/chunk) kill false positives. |
 | **Recency** (DEC-014) | Query-relative temporal boost | Historical corpus — "recent" = near the *queried* period, not wall-clock newest. Flags staleness → honest abstention. |
-| **LLM provider** (DEC-010) | Anthropic direct (not OpenRouter) | Native prompt-caching + tool-use are load-bearing; OpenRouter's OpenAI-compat layer loses them. |
+| **LLM provider** (DEC-010 → DEC-018) | Gateway switch: OpenRouter's Anthropic-compatible endpoint *or* Anthropic direct (`LLM_GATEWAY`) | DEC-010 rejected OpenRouter's OpenAI-compat layer (loses caching + tool use); DEC-018 uses its Anthropic-compatible Messages endpoint instead — same SDK, tool use and streaming. |
 | **Self-contained serve** (DEC-012) | Full text in Qdrant payload; no DuckDB on deploy | Deploy needs no 664MB DuckDB, no local model → fits free tier. |
 
 **Deliberately cut** (documented, not omitted): full-corpus chunking ablation,
@@ -164,8 +171,12 @@ signal.
   rerank sharpens ordering (MRR/NDCG) more than coverage (Recall).
 - **Faithfulness (anti-hallucination gate):** RAGAS **0.806** — passes the 0.80
   North-Star gate (Claude judge + Voyage embeddings).
-- **CI:** lightweight per-push (ruff + serve-import guard + 23 unit tests, no API
-  calls). The expensive RAGAS gate runs manually/pre-deploy by design.
+- **CI:** lightweight per-push (ruff + serve-import guard + 29 unit tests, no API
+  calls). The expensive RAGAS gate runs manually/pre-deploy by design. A separate
+  `frontend-ci` workflow typechecks, runs 27 Vitest tests and builds `frontend/`.
+- **Live behavioral suite** (DEC-022): 9 cases run from the frontend against the
+  deployed API — expected behavior (ground / refuse / conflict node ran) + citation
+  integrity. Complements RAGAS; doesn't replace it.
 
 **Honesty layer** (DEC-015): every place a prettier number was possible (pad the
 prompt for cache hits, drop low answer_relevancy, cherry-pick chunking labels), the
@@ -175,17 +186,24 @@ real number + reason was reported instead.
 
 ## 8. Deployment & operations
 
-**Topology:** two Render web services (`finsight-api` + `finsight-ui`, free tier)
-→ Qdrant Cloud (free 1GB, `finsight-prod`, ~158MB used) → external APIs (Anthropic,
-Voyage, Cohere, LangSmith). Secrets are Render env vars (never committed).
+**Topology:** two Cloud Run services from one image (`finsight-api` + `finsight-ui`,
+`min-instances=1`, DEC-019) → Qdrant Cloud (free 1GB, `finsight-prod`, ~158MB used)
+→ external APIs (Claude via OpenRouter or Anthropic, Voyage, Cohere, LangSmith).
+Secrets in Secret Manager under a dedicated service account (never committed). The
+Render free-tier services remain as a backup. The React frontend (`frontend/`) is a
+static build for any static host; it needs only its origin allowed by the API's
+`CORS_ALLOW_ORIGINS` (default `*`).
 
 **Self-contained serve:** `EMBEDDING_BACKEND=voyage` (no local model) +
 `USE_DUCKDB_HYDRATION=false` (full text from Qdrant payload) → the app is a pure API
 client that fits 512MB.
 
-**Observability:** LangSmith per-node tracing; per-query cost estimate
+**Observability:** LangSmith per-node tracing; W&B Weave `@op` on all 6 nodes
+(opt-in via `WEAVE_ENABLED`, DEC-017); per-query cost estimate
 (`cost_tracker`) and 5-mode failure classification (`failure_tracker`) logged to
-JSONL; `/feedback` captures thumbs up/down.
+JSONL; `/feedback` captures thumbs up/down. Client-side, the frontend optionally
+records per-query outcome / TTFT / latency / route / tokens / cost and uncaught
+errors to insert-only Bolt Database (Supabase) tables — no question text (DEC-023).
 
 **Resilience chain:** Voyage down → bge-m3 local; Cohere down → local cross-encoder
 → raw order; Claude down → pipeline nodes degrade to safe defaults; ungrounded →
@@ -221,5 +239,7 @@ requirements drift caught by a CI import-guard.
 
 Python 3.11 · FastAPI · LangGraph · Qdrant (+ Qdrant Cloud) · DuckDB · Claude
 (Sonnet 4.6 + Haiku 4.5, Anthropic SDK) · voyage-finance-2 / bge-m3 · Cohere
-rerank-v3.5 / ms-marco-MiniLM · fastembed (BM25) · RAGAS · Streamlit · ruff +
-pytest + GitHub Actions CI · Render deploy.
+rerank-v3.5 / ms-marco-MiniLM · fastembed (BM25) · RAGAS · Streamlit · React 18 +
+Vite + TypeScript + Tailwind + shadcn/ui + Recharts (frontend) · Vitest · Bolt
+Database (telemetry only) · ruff + pytest + GitHub Actions CI · Cloud Run deploy
+(Render backup).

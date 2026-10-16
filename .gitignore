@@ -207,6 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 # FinSight project
+# The Python-template `lib/` rule above would otherwise drop the frontend's API client and tests
+!frontend/src/lib/
 .DS_Store
 .cursor/
 data/raw/
