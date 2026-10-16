@@ -212,6 +212,8 @@ Desktop account needed). bge-m3 embeddings available locally as the Voyage fallb
 Since DEC-019 the live demo runs on Google Cloud Run: `finsight-api` and
 `finsight-ui` from one image, `min-instances=1` (no cold start), secrets in Secret
 Manager. The Render topology below is kept as the backup and still applies to it.
+Since DEC-025 the React frontend is served from Vercel at `finsight.ameyparmarthi.com`
+and calls `finsight-api` directly; the API's CORS allowlist is that origin plus localhost.
 
 ### Backup (Render + Qdrant Cloud)
 

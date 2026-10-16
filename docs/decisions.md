@@ -947,6 +947,48 @@ Option C.
 
 ---
 
+## DEC-025: React frontend on Vercel, calling the Cloud Run API directly
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+### Context
+The React frontend (DEC-020…024) only ran locally. The live demo link pointed at the Streamlit UI on Cloud Run, which can't show the evidence panel, the pipeline trace or the live eval suite. The frontend is a static Vite bundle with no server code, so all it needs is a host and an origin the API allows.
+
+### Options considered
+A. **A third always-on Cloud Run service serving the bundle.** Everything stays in one GCP project, but it adds a standing container (DEC-019 already runs two) just to serve static files.
+B. **Cloud Storage + Cloud CDN.** No container, but HTTPS on a custom domain needs a global load balancer, and there are no per-PR previews.
+C. **Vercel, building from `frontend/`.** No idle compute, managed TLS on a custom domain, production deploys from `main`, and a preview URL on every PR.
+D. **Vercel with a same-origin rewrite (`/api/*` → Cloud Run).** This removes CORS, but every request then comes from Vercel's edge. DEC-024's per-IP rate limit would only see Vercel's IPs, unless it trusted a forwarded header the client can spoof. It would also put a proxy hop in the middle of a ~35 s conflict-query stream.
+
+### Decision
+Option C.
+- **Hosting:** Vercel project with Root Directory `frontend`, live at `https://finsight.ameyparmarthi.com` (a `finsight` CNAME → `cname.vercel-dns.com`).
+- **API path:** the browser calls the Cloud Run API directly, including the SSE stream. `VITE_API_URL` is optional; blank falls back to the Cloud Run URL in `api.ts`.
+- **CORS:** `CORS_ALLOW_ORIGINS=https://finsight.ameyparmarthi.com,http://localhost:5173` on Cloud Run. Verified: preflights from both origins return 200 with the matching `Access-Control-Allow-Origin`, and any other origin gets 400.
+- **README:** the React UI is now the primary live-demo link. Streamlit stays as the secondary demo, and Render as the backup.
+- **Verified end to end (2026-10-16):** the live site loaded in live mode, streamed a grounded answer, and recorded its `query_events` row through `/telemetry/query` (200). The verification row was then deleted.
+
+### Trade-offs
+- **Gain:**
+  - The full evidence UI is the public demo, with nothing to keep warm on the frontend side.
+  - Previews on every PR.
+  - The API keeps seeing real client IPs, so DEC-024's rate limit still works.
+- **Lose:**
+  - **Previews run in demo mode.** `*.vercel.app` preview origins aren't on the CORS list, so a preview can't test against the live API. Testing against it means localhost or production.
+  - **Two vendors on the request path** (Vercel + GCP), with two dashboards and two deploy pipelines.
+  - **Networks that rewrite DNS can force demo mode.** Found during verification: a VPN whose DNS answered `*.run.app` with a `100.64.x.x` address made Chrome's Local Network Access check block the public page's calls to the API. The site fell back to demo mode, as DEC-021 designed. Off that VPN, the API resolves to public Google IPs and the site is live. Option D would avoid this, at the costs listed above.
+- **Deploy gotcha found on the way:** `finsight-api` traffic had been pinned to a named revision, so the DEC-024 deploy created a healthy revision that served 0%, while gcloud reported the old one as "serving 100 percent". Fixed with `update-traffic --to-latest`; the check is in the README deploy section.
+
+### Interview framing
+> "The frontend is static, so I put it on Vercel and had the browser call the Cloud Run API directly. The same-origin proxy looked cleaner because it removes CORS, but it would have hidden every client IP behind Vercel's edge and broken my per-IP rate limit. So I kept the direct path and locked CORS to the production origin. Verifying it from my own laptop, the site dropped into demo mode. My VPN's DNS resolved the API to a private address, and Chrome blocked it. The fallback I'd designed for an API outage covered a network problem I hadn't planned for."
+
+### Revisit trigger
+- Previews need the live API → add the preview origin pattern to CORS, or give previews a separate API URL.
+- Visitors behind DNS-rewriting networks report demo mode → revisit Option D, with a forwarded-header scheme the rate limit can trust.
+- Interview season ends → nothing to scale down on the frontend side; see DEC-019 for the API.
+
+---
+
 ## Format notes for future entries
 
 - Write these **as they happen**, not retroactively. Retroactive entries sound fake in interviews.
