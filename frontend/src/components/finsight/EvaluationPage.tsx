@@ -106,7 +106,7 @@ export function EvaluationPage({ demo, onOpenQuestion }: Props) {
             </Button>
           )}
           <p className="text-[11px] text-muted-foreground">
-            {demo ? 'Demo mode: replays captured responses, no API cost' : `${total} live queries · roughly $0.15 total`}
+            {demo ? 'Demo mode: replays captured responses, no API cost' : `${total} live queries · about $0.13 total (measured 2026-10-16)`}
           </p>
         </div>
       </motion.div>

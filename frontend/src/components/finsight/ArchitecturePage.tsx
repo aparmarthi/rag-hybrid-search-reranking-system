@@ -62,32 +62,36 @@ export function ArchitecturePage({ apiUrl }: { apiUrl: string }) {
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Pipeline flow</h2>
         <div className="grid items-stretch gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr_auto_1fr]">
-          <PipelineNode icon={Brain} title="Understand" subtitle="Haiku · ~1.5 s" color="bg-sky-600" delay={0.1}>
+          <PipelineNode icon={Brain} title="Understand" subtitle="Haiku · ~1.2 s" color="bg-sky-600" delay={0.1}>
             Rewrites the question and extracts the period it asks about, which drives recency and staleness.
           </PipelineNode>
           <Arrow delay={0.15} />
-          <PipelineNode icon={Route} title="Route" subtitle="Haiku · ~0.8 s" color="bg-cyan-600" delay={0.2}>
+          <PipelineNode icon={Route} title="Route" subtitle="Haiku · ~0.9 s" color="bg-cyan-600" delay={0.2}>
             Three paths: <span className="font-mono text-foreground">earnings_analysis</span>,{' '}
             <span className="font-mono text-foreground">financial_metrics</span>,{' '}
             <span className="font-mono text-foreground">risk_and_events</span>.
           </PipelineNode>
           <Arrow delay={0.25} />
-          <PipelineNode icon={Database} title="Retrieve" subtitle="Qdrant · ~0.4 s" color="bg-teal-600" delay={0.3}>
+          <PipelineNode icon={Database} title="Retrieve" subtitle="Qdrant · ~0.3 s" color="bg-teal-600" delay={0.3}>
             BM25 + dense voyage-finance-2, fused server-side with RRF in a single query.
           </PipelineNode>
           <Arrow delay={0.35} />
-          <PipelineNode icon={Filter} title="Rerank" subtitle="Cohere · ~1.9 s" color="bg-emerald-600" delay={0.4}>
+          <PipelineNode icon={Filter} title="Rerank" subtitle="Cohere · ~0.15 s" color="bg-emerald-600" delay={0.4}>
             Cross-encoder rerank plus a recency boost toward the asked-about period. Top 5 become citable evidence.
           </PipelineNode>
           <Arrow delay={0.45} />
-          <PipelineNode icon={GitCompareArrows} title="Conflicts" subtitle="Sonnet · gated" color="bg-rose-600" delay={0.5}>
+          <PipelineNode icon={GitCompareArrows} title="Conflicts" subtitle="Sonnet · gated · ~25 s" color="bg-rose-600" delay={0.5}>
             Extracts numeric claims and flags guidance-vs-actual drift across calls. Runs only on comparison intent.
           </PipelineNode>
           <Arrow delay={0.55} />
-          <PipelineNode icon={Sparkles} title="Generate" subtitle="Sonnet · ~7–8 s" color="bg-amber-600" delay={0.6}>
+          <PipelineNode icon={Sparkles} title="Generate" subtitle="Sonnet · ~7.5 s" color="bg-amber-600" delay={0.6}>
             Streams an answer with inline [N] citations, or INSUFFICIENT EVIDENCE when the passages do not support one.
           </PipelineNode>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Node times are live medians over the 9 eval questions (conflicts: the 3 where it ran), measured 2026-10-16 against the
+          deployed API. Source: <span className="font-mono">evals/results/live_measurements_20261016T045744Z.json</span>.
+        </p>
       </section>
 
       <section className="space-y-4">

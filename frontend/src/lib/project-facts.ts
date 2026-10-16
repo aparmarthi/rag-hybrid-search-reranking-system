@@ -14,7 +14,7 @@ export const DECISIONS: Decision[] = [
     id: 'DEC-011',
     title: 'Inline [N] citations over forced tool use',
     decision:
-      'Forced tool-use citations buffered the whole answer: 11.6 s to first token. Streaming plain text with inline [N] markers, parsed afterward, brought it to 1.3 s with the same source mapping (a Week 1 figure; live end-to-end TTFT through the full pipeline is 4.3 s).',
+      'Forced tool-use citations buffered the whole answer: 11.6 s to first token. Streaming plain text with inline [N] markers, parsed afterward, brought it to 1.3 s with the same source mapping (a Week 1 figure; live end-to-end TTFT through the full pipeline is 3.6 s median, measured 2026-10-16).',
     tradeoff: 'Gives up schema-enforced citations for a streaming UX; mitigated by post-hoc parsing and validation.',
   },
   {
@@ -22,7 +22,7 @@ export const DECISIONS: Decision[] = [
     title: 'Precision-gated conflict detector',
     decision:
       'Naive numeric comparison produced false positives. Four gates (different chunks, comparable periods, matching subject, different call dates) removed each class, verified against a constructed NVDA guidance conflict and a control.',
-    tradeoff: 'The extraction call adds 14–20 s, so it only runs on comparison intent. Retrieval does not always fetch both halves of a conflict.',
+    tradeoff: 'The extraction call adds ~25 s live, so it only runs on comparison intent. Retrieval does not always fetch both halves of a conflict.',
   },
   {
     id: 'DEC-014',
@@ -79,8 +79,8 @@ export interface EvalMetric {
 export const OFFLINE_METRICS: EvalMetric[] = [
   { label: 'Faithfulness (RAGAS)', target: '≥ 0.80', measured: '0.806', met: true, note: 'n=40, Claude judge + Voyage embeddings' },
   { label: 'NDCG@10 lift vs dense', target: '≥ 10%', measured: '+27.4%', met: true, note: 'Hybrid + rerank vs dense only, n=40' },
-  { label: 'Latency', target: 'P95 ≤ 3 s', measured: '4.3 s TTFT', met: false, note: 'Full answer ~12–15 s; conflict queries ~25–30 s' },
-  { label: 'Cost per query', target: '≤ $0.005', measured: '$0.0135', met: false, note: 'Mean, n=5 live; ~3.2K evidence tokens to Sonnet is the floor' },
+  { label: 'Latency', target: 'P95 ≤ 3 s', measured: '3.6 s TTFT', met: false, note: 'Live median, n=4 (3.4–3.9 s). Full answer ~11 s; conflict queries ~34–36 s' },
+  { label: 'Cost per query', target: '≤ $0.005', measured: '$0.0139', met: false, note: 'Mean, n=9 live (2026-10-16); ~3.2K evidence tokens to Sonnet is the floor' },
 ];
 
 export const RETRIEVAL_ABLATION = [
